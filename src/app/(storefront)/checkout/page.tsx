@@ -1,95 +1,238 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import {
   ChevronRight,
   MapPin,
   Truck,
   Store,
+  Clock,
+  Zap,
   CheckCircle2,
   Snowflake,
   ShoppingBag,
   ArrowRight,
   CreditCard,
+  Wallet,
+  Building2,
+  Smartphone,
   ClipboardList,
+  AlertTriangle,
+  AlertCircle,
+  Loader2,
+  LogIn,
+  PackageCheck,
 } from 'lucide-react';
 import { useCartStore } from '@/stores/cart.store';
 import { useBranchStore } from '@/stores/branch.store';
 import { useAuthStore } from '@/stores/auth.store';
-import { useOrdersStore } from '@/stores/orders.store';
+import { branchesApi, inventoryApi, ordersApi } from '@/lib/api';
+import {
+  Branch,
+  DeliveryType,
+  Order,
+  PaymentMethod,
+  ProductAvailability,
+} from '@/types';
 import { formatVND, getStorageBadge } from '@/components/ProductCard';
 import { BRAND_ASSETS } from '@/data/cobi-content';
-import { useTranslation } from '@/i18n';
+import {
+  useTranslation,
+  getLocalizedProductName,
+  getLocalizedBranchName,
+  getLocalizedBranchAddress,
+} from '@/i18n';
 
 export default function CheckoutPage() {
+  const queryClient = useQueryClient();
   const { items, getTotalPrice, hasMixedStorage, clearCart } = useCartStore();
-  const { selectedBranch } = useBranchStore();
-  const { user } = useAuthStore();
-  const { addOrder } = useOrdersStore();
+  const { selectedBranch, setSelectedBranch } = useBranchStore();
+  const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
 
   const [mounted, setMounted] = useState(false);
-  const [deliveryMethod, setDeliveryMethod] = useState<'DELIVERY' | 'PICKUP'>('DELIVERY');
-  const [fullName, setFullName] = useState(user?.fullName || '');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [note, setNote] = useState('');
-  const [orderSubmitted, setOrderSubmitted] = useState(false);
-  const [submittedTotal, setSubmittedTotal] = useState(0);
-  const [submittedOrderId, setSubmittedOrderId] = useState('');
+  const [deliveryType, setDeliveryType] = useState<DeliveryType>('EXPRESS_NOW');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
 
   useEffect(() => {
     setMounted(true);
-    if (user?.fullName && !fullName) {
-      setFullName(user.fullName);
-    }
-  }, [user?.fullName, fullName]);
+  }, []);
 
+  // Fetch branches in current locale in case none selected yet
+  const { data: branches = [] } = useQuery<Branch[]>({
+    queryKey: ['branches', locale],
+    queryFn: () => branchesApi.getBranches(locale),
+  });
+
+  useEffect(() => {
+    if (mounted && branches.length > 0 && !selectedBranch) {
+      setSelectedBranch(branches[0]);
+    }
+  }, [mounted, branches, selectedBranch, setSelectedBranch]);
+
+  const activeBranch = mounted ? selectedBranch || branches[0] || null : null;
   const safeItems = mounted ? items : [];
   const subtotal = mounted ? getTotalPrice() : 0;
   const isMixed = mounted ? hasMixedStorage() : false;
-  const shippingFee = deliveryMethod === 'DELIVERY' ? 25000 : 0;
-  const total = subtotal + shippingFee;
+  const shippingFee = deliveryType === 'PICKUP' ? 0 : 25000;
+  const displayTotal = subtotal + shippingFee;
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const orderId = `COBI-${Date.now().toString().slice(-6)}`;
-    addOrder({
-      id: orderId,
-      createdAt: new Date().toISOString(),
-      fullName,
-      phone,
-      address: deliveryMethod === 'DELIVERY' ? address : selectedBranch?.address,
-      note: note || undefined,
-      deliveryMethod,
-      paymentMethod: 'COD',
-      branchName: selectedBranch?.name,
-      subtotal,
-      shippingFee,
-      total,
-      status: 'PENDING',
-      items: safeItems.map((entry) => ({
-        productId: entry.product.id,
-        name: entry.product.name,
-        slug: entry.product.slug,
-        price: entry.product.price,
-        quantity: entry.quantity,
-        storageType: entry.product.storageType,
-        image:
-          entry.product.images && entry.product.images.length > 0
-            ? entry.product.images[0]
-            : BRAND_ASSETS.heroImage,
-      })),
+  // Live Inventory Availability Check for each item at selected branch
+  const itemIdsSignature = safeItems.map((i) => `${i.productId}:${i.quantity}`).join(',');
+  const { data: availabilityMap = {}, isFetching: isCheckingStock } = useQuery<
+    Record<string, ProductAvailability | null>
+  >({
+    queryKey: ['checkout-availability', activeBranch?.id, itemIdsSignature],
+    enabled: Boolean(mounted && activeBranch?.id && safeItems.length > 0),
+    queryFn: async () => {
+      if (!activeBranch) return {};
+      const entries = await Promise.all(
+        safeItems.map(async (item) => {
+          try {
+            const avail = await inventoryApi.getAvailability(activeBranch.id, item.productId);
+            return [item.productId, avail] as const;
+          } catch {
+            return [item.productId, null] as const;
+          }
+        })
+      );
+      return Object.fromEntries(entries);
+    },
+  });
+
+  const stockIssues = useMemo(() => {
+    if (!activeBranch || Object.keys(availabilityMap).length === 0) return {};
+    const map: Record<string, { available: number; insufficient: boolean }> = {};
+    safeItems.forEach((item) => {
+      const availObj = availabilityMap[item.productId];
+      if (availObj) {
+        map[item.productId] = {
+          available: availObj.totalAvailable,
+          insufficient: availObj.totalAvailable < item.quantity,
+        };
+      }
     });
+    return map;
+  }, [activeBranch, availabilityMap, safeItems]);
 
-    setSubmittedOrderId(orderId);
-    setSubmittedTotal(total);
-    setOrderSubmitted(true);
-    clearCart();
+  const hasStockError = Object.values(stockIssues).some((s) => s.insufficient);
+
+  // React Hook Form + Zod schema
+  const checkoutSchema = useMemo(
+    () =>
+      z
+        .object({
+          recipientName: z.string().trim().min(2, t.checkoutPage.validationName),
+          phone: z
+            .string()
+            .trim()
+            .regex(/^[0-9+\-\s]{9,15}$/, t.checkoutPage.validationPhone),
+          address: z.string().trim().optional(),
+          note: z.string().trim().optional(),
+        })
+        .superRefine((vals, ctx) => {
+          if (deliveryType !== 'PICKUP' && (!vals.address || vals.address.trim().length < 5)) {
+            ctx.addIssue({
+              code: z.ZodIssueCode.custom,
+              path: ['address'],
+              message: t.checkoutPage.validationAddress,
+            });
+          }
+        }),
+    [deliveryType, t]
+  );
+
+  type CheckoutFormValues = z.infer<typeof checkoutSchema>;
+
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<CheckoutFormValues>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: {
+      recipientName: '',
+      phone: '',
+      address: '',
+      note: '',
+    },
+  });
+
+  useEffect(() => {
+    if (mounted && user?.fullName) {
+      setValue('recipientName', user.fullName);
+    }
+  }, [mounted, user?.fullName, setValue]);
+
+  const createOrderMutation = useMutation({
+    mutationFn: (values: CheckoutFormValues) => {
+      if (!activeBranch) {
+        throw new Error('Branch is required');
+      }
+      const branchLabel = getLocalizedBranchName(activeBranch, locale);
+      const branchAddr = getLocalizedBranchAddress(activeBranch, locale);
+      return ordersApi.create({
+        branchId: activeBranch.id,
+        items: safeItems.map((entry) => ({
+          productId: entry.productId,
+          quantity: entry.quantity,
+        })),
+        paymentMethod,
+        deliveryType,
+        shippingAddress: {
+          recipientName: values.recipientName.trim(),
+          phone: values.phone.trim(),
+          address:
+            deliveryType === 'PICKUP'
+              ? `${t.checkoutPage.pickupMethodName}: ${branchLabel} (${branchAddr})`
+              : (values.address || '').trim(),
+        },
+        note: values.note?.trim() || undefined,
+      });
+    },
+    onSuccess: (order) => {
+      setCreatedOrder(order);
+      clearCart();
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory-batches'] });
+      queryClient.invalidateQueries({ queryKey: ['checkout-availability'] });
+    },
+    onError: (err: any) => {
+      const rawMsg = err?.response?.data?.message || err?.message;
+      const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg;
+      setServerError(msg || t.checkoutPage.orderErrorFallback);
+    },
+  });
+
+  const onSubmit = (values: CheckoutFormValues) => {
+    setServerError(null);
+    if (!isAuthenticated) {
+      setServerError(t.checkoutPage.loginRequiredDesc);
+      return;
+    }
+    if (!activeBranch || hasStockError) {
+      setServerError(t.checkoutPage.stockErrorNotice);
+      return;
+    }
+    createOrderMutation.mutate(values);
   };
 
-  if (orderSubmitted) {
+  const getDeliveryName = (dt: DeliveryType) => {
+    if (dt === 'EXPRESS_NOW') return t.checkoutPage.expressDeliveryName;
+    if (dt === 'SCHEDULED') return t.checkoutPage.scheduledDeliveryName;
+    return t.checkoutPage.pickupMethodName;
+  };
+
+  if (createdOrder) {
     return (
       <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6 py-16">
         <div className="bg-white rounded-3xl p-8 sm:p-10 max-w-lg w-full text-center space-y-5 border border-stone-200 shadow-lg">
@@ -97,8 +240,8 @@ export default function CheckoutPage() {
             <CheckCircle2 className="w-9 h-9" />
           </div>
           <div className="space-y-2">
-            <span className="inline-block px-3 py-1 rounded-full bg-orange-50 text-[#F37021] text-xs font-mono font-bold border border-orange-200">
-              #{submittedOrderId}
+            <span className="inline-block px-3.5 py-1 rounded-full bg-orange-50 text-[#F37021] text-xs font-mono font-bold border border-orange-200">
+              {createdOrder.orderCode}
             </span>
             <h1 className="font-display text-2xl font-bold text-[#231812]">
               {t.checkoutPage.successTitle}
@@ -108,32 +251,38 @@ export default function CheckoutPage() {
               <strong className="text-[#F37021]">{t.common.brandName}</strong>.{' '}
               {t.checkoutPage.successDescMid}{' '}
               <strong className="text-[#231812]">
-                {selectedBranch?.name || t.checkoutPage.nearestBranch}
+                {createdOrder.branch
+                  ? getLocalizedBranchName(createdOrder.branch, locale)
+                  : activeBranch
+                  ? getLocalizedBranchName(activeBranch, locale)
+                  : t.checkoutPage.nearestBranch}
               </strong>{' '}
               {t.checkoutPage.successDescSuffix}
             </p>
           </div>
 
-          <div className="bg-[#FAF7F2] rounded-2xl p-4 text-xs text-stone-700 space-y-1.5 text-left border border-stone-200/80">
+          <div className="bg-[#FAF7F2] rounded-2xl p-4 text-xs text-stone-700 space-y-2 text-left border border-stone-200/80">
             <div className="flex justify-between">
               <span className="text-stone-500">{t.checkoutPage.recipientLabel}</span>
-              <span className="font-bold">{fullName}</span>
+              <span className="font-bold">{createdOrder.shippingAddress.recipientName}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-stone-500">{t.checkoutPage.phoneLabel}</span>
-              <span className="font-bold">{phone}</span>
+              <span className="font-bold">{createdOrder.shippingAddress.phone}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-stone-500">{t.checkoutPage.methodLabel}</span>
-              <span className="font-bold">
-                {deliveryMethod === 'DELIVERY'
-                  ? t.checkoutPage.deliveryMethodName
-                  : t.checkoutPage.pickupMethodName}
-              </span>
+              <span className="font-bold">{getDeliveryName(createdOrder.deliveryType)}</span>
             </div>
-            <div className="flex justify-between pt-1.5 border-t border-stone-200">
+            <div className="flex justify-between">
+              <span className="text-stone-500">{t.checkoutPage.paymentSelectedLabel}</span>
+              <span className="font-bold font-mono">{createdOrder.paymentMethod}</span>
+            </div>
+            <div className="flex justify-between pt-2 border-t border-stone-200">
               <span className="text-stone-500 font-bold">{t.checkoutPage.totalLabel}</span>
-              <span className="font-black text-[#F37021] text-sm">{formatVND(submittedTotal)}</span>
+              <span className="font-black text-[#F37021] text-sm">
+                {formatVND(createdOrder.totalAmount)}
+              </span>
             </div>
           </div>
 
@@ -181,6 +330,64 @@ export default function CheckoutPage() {
     );
   }
 
+  const deliveryOptions: {
+    id: DeliveryType;
+    title: string;
+    desc: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'EXPRESS_NOW',
+      title: t.checkoutPage.expressTitle,
+      desc: t.checkoutPage.expressDesc,
+      icon: <Zap className="w-4 h-4" />,
+    },
+    {
+      id: 'SCHEDULED',
+      title: t.checkoutPage.scheduledTitle,
+      desc: t.checkoutPage.scheduledDesc,
+      icon: <Clock className="w-4 h-4" />,
+    },
+    {
+      id: 'PICKUP',
+      title: t.checkoutPage.pickupTitle,
+      desc: t.checkoutPage.pickupDesc,
+      icon: <Store className="w-4 h-4" />,
+    },
+  ];
+
+  const paymentOptions: {
+    id: PaymentMethod;
+    title: string;
+    desc: string;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      id: 'COD',
+      title: t.checkoutPage.codTitle,
+      desc: t.checkoutPage.codDesc,
+      icon: <Wallet className="w-4 h-4" />,
+    },
+    {
+      id: 'BANK_TRANSFER',
+      title: t.checkoutPage.bankTitle,
+      desc: t.checkoutPage.bankDesc,
+      icon: <Building2 className="w-4 h-4" />,
+    },
+    {
+      id: 'MOMO',
+      title: t.checkoutPage.momoTitle,
+      desc: t.checkoutPage.momoDesc,
+      icon: <Smartphone className="w-4 h-4" />,
+    },
+    {
+      id: 'VNPAY',
+      title: t.checkoutPage.vnpayTitle,
+      desc: t.checkoutPage.vnpayDesc,
+      icon: <CreditCard className="w-4 h-4" />,
+    },
+  ];
+
   return (
     <div className="bg-[#FAF7F2] min-h-screen py-8 sm:py-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
@@ -201,9 +408,29 @@ export default function CheckoutPage() {
           {t.checkoutPage.title}
         </h1>
 
+        {/* Auth Reminder Alert */}
+        {mounted && !isAuthenticated && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-950 space-y-0.5">
+                <strong className="block font-bold">{t.checkoutPage.loginRequiredTitle}</strong>
+                <p className="text-amber-900">{t.checkoutPage.loginRequiredDesc}</p>
+              </div>
+            </div>
+            <Link
+              href="/login?redirect=/checkout"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#231812] hover:bg-black text-white text-xs font-bold shrink-0 self-start sm:self-center"
+            >
+              <LogIn className="w-3.5 h-3.5 text-[#F37021]" />
+              <span>{t.checkoutPage.loginToCheckoutBtn}</span>
+            </Link>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* LEFT: Customer & Delivery Form */}
-          <form onSubmit={handleSubmit} className="lg:col-span-7 space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="lg:col-span-7 space-y-6">
             {isMixed && (
               <div className="bg-cyan-50/90 border border-cyan-200 rounded-2xl p-4 flex items-start gap-3">
                 <Snowflake className="w-5 h-5 text-cyan-700 shrink-0 mt-0.5" />
@@ -214,77 +441,71 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs space-y-6">
-              <div className="space-y-3">
-                <label className="text-xs font-bold uppercase tracking-wider text-stone-500 block">
-                  {t.checkoutPage.receiveMethodHeading}
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryMethod('DELIVERY')}
-                    className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3 ${
-                      deliveryMethod === 'DELIVERY'
-                        ? 'border-[#F37021] bg-orange-50/50'
-                        : 'border-stone-200 hover:border-stone-300'
-                    }`}
-                  >
-                    <Truck
-                      className={`w-5 h-5 ${
-                        deliveryMethod === 'DELIVERY' ? 'text-[#F37021]' : 'text-stone-400'
-                      }`}
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-[#231812] block">
-                        {t.checkoutPage.deliveryMethodName}
-                      </span>
-                      <span className="text-[10px] text-stone-500">
-                        {formatVND(25000)}
-                      </span>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setDeliveryMethod('PICKUP')}
-                    className={`p-4 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-center gap-3 ${
-                      deliveryMethod === 'PICKUP'
-                        ? 'border-[#F37021] bg-orange-50/50'
-                        : 'border-stone-200 hover:border-stone-300'
-                    }`}
-                  >
-                    <Store
-                      className={`w-5 h-5 ${
-                        deliveryMethod === 'PICKUP' ? 'text-[#F37021]' : 'text-stone-400'
-                      }`}
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-[#231812] block">
-                        {t.checkoutPage.pickupMethodName}
-                      </span>
-                      <span className="text-[10px] text-emerald-700 font-semibold">
-                        {t.checkoutPage.freePickup}
-                      </span>
-                    </div>
-                  </button>
-                </div>
+            {serverError && (
+              <div className="bg-red-50 border border-red-200 text-red-700 rounded-2xl p-4 flex items-start gap-2.5 text-xs font-medium">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <span>{serverError}</span>
               </div>
+            )}
 
+            <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs space-y-6">
               {/* Branch summary */}
-              {selectedBranch && (
-                <div className="bg-[#FAF7F2] rounded-2xl p-3.5 border border-stone-200/80 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <MapPin className="w-4 h-4 text-[#F37021] shrink-0" />
-                    <span className="text-stone-500">{t.checkoutPage.handlingBranch}</span>
-                    <strong className="text-[#231812] truncate">{selectedBranch.name}</strong>
+              {activeBranch && (
+                <div className="bg-[#FAF7F2] rounded-2xl p-4 border border-stone-200/80 flex items-center justify-between gap-3 text-xs">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <MapPin className="w-4 h-4 text-[#F37021] shrink-0 mt-0.5" />
+                    <div className="min-w-0">
+                      <span className="text-stone-500 block">{t.checkoutPage.handlingBranch}</span>
+                      <strong className="text-[#231812] block truncate">
+                        {getLocalizedBranchName(activeBranch, locale)}
+                      </strong>
+                      <span className="text-[11px] text-stone-500 block truncate">
+                        {getLocalizedBranchAddress(activeBranch, locale)}
+                      </span>
+                    </div>
                   </div>
-                  <Link href="/stores" className="text-[#F37021] font-bold hover:underline shrink-0">
+                  <Link
+                    href="/stores"
+                    className="text-[#F37021] font-bold hover:underline shrink-0 px-2 py-1"
+                  >
                     {t.common.change}
                   </Link>
                 </div>
               )}
 
-              {/* Customer Inputs */}
+              {/* Delivery Types (EXPRESS_NOW / SCHEDULED / PICKUP) */}
+              <div className="space-y-3">
+                <label className="text-xs font-bold uppercase tracking-wider text-stone-500 block">
+                  {t.checkoutPage.receiveMethodHeading}
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {deliveryOptions.map((opt) => {
+                    const isSelected = deliveryType === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setDeliveryType(opt.id)}
+                        className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                          isSelected
+                            ? 'border-[#F37021] bg-orange-50/50'
+                            : 'border-stone-200 hover:border-stone-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={isSelected ? 'text-[#F37021]' : 'text-stone-400'}>
+                            {opt.icon}
+                          </span>
+                          <span className="text-xs font-bold text-[#231812]">{opt.title}</span>
+                        </div>
+                        <span className="text-[11px] text-stone-500 leading-snug">{opt.desc}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Customer Inputs (React Hook Form) */}
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
@@ -293,41 +514,61 @@ export default function CheckoutPage() {
                     </label>
                     <input
                       type="text"
-                      required
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      {...register('recipientName')}
                       placeholder={t.checkoutPage.fullNamePlaceholder}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#F37021]"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-[#FAF7F2] text-sm focus:outline-none ${
+                        errors.recipientName
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-stone-200 focus:border-[#F37021]'
+                      }`}
                     />
+                    {errors.recipientName && (
+                      <p className="text-[11px] text-red-600 font-medium">
+                        {errors.recipientName.message}
+                      </p>
+                    )}
                   </div>
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-stone-700">
                       {t.checkoutPage.phoneInputLabel}
                     </label>
                     <input
                       type="tel"
-                      required
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      {...register('phone')}
                       placeholder="09xx xxx xxx"
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#F37021]"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-[#FAF7F2] text-sm focus:outline-none ${
+                        errors.phone
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-stone-200 focus:border-[#F37021]'
+                      }`}
                     />
+                    {errors.phone && (
+                      <p className="text-[11px] text-red-600 font-medium">{errors.phone.message}</p>
+                    )}
                   </div>
                 </div>
 
-                {deliveryMethod === 'DELIVERY' && (
+                {deliveryType !== 'PICKUP' && (
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-stone-700">
                       {t.checkoutPage.addressLabel}
                     </label>
                     <input
                       type="text"
-                      required
-                      value={address}
-                      onChange={(e) => setAddress(e.target.value)}
+                      {...register('address')}
                       placeholder={t.checkoutPage.addressPlaceholder}
-                      className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#F37021]"
+                      className={`w-full px-3.5 py-2.5 rounded-xl border bg-[#FAF7F2] text-sm focus:outline-none ${
+                        errors.address
+                          ? 'border-red-400 focus:border-red-500'
+                          : 'border-stone-200 focus:border-[#F37021]'
+                      }`}
                     />
+                    {errors.address && (
+                      <p className="text-[11px] text-red-600 font-medium">
+                        {errors.address.message}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -337,36 +578,65 @@ export default function CheckoutPage() {
                   </label>
                   <textarea
                     rows={2}
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    {...register('note')}
                     placeholder={t.checkoutPage.notePlaceholder}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-stone-200 bg-[#FAF7F2] text-sm focus:outline-none focus:border-[#F37021]"
                   />
                 </div>
               </div>
 
-              {/* Payment Method */}
-              <div className="pt-2 border-t border-stone-100 space-y-2.5">
+              {/* Payment Methods (COD / BANK_TRANSFER / MOMO / VNPAY) */}
+              <div className="pt-2 border-t border-stone-100 space-y-3">
                 <label className="text-xs font-bold uppercase tracking-wider text-stone-500 block">
                   {t.checkoutPage.paymentMethodLabel}
                 </label>
-                <div className="p-3.5 rounded-2xl border border-[#F37021] bg-orange-50/40 flex items-center gap-3">
-                  <CreditCard className="w-5 h-5 text-[#F37021] shrink-0" />
-                  <div>
-                    <span className="text-xs font-bold text-[#231812] block">
-                      {t.checkoutPage.codTitle}
-                    </span>
-                    <span className="text-[11px] text-stone-500">{t.checkoutPage.codDesc}</span>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {paymentOptions.map((pm) => {
+                    const isSelected = paymentMethod === pm.id;
+                    return (
+                      <button
+                        key={pm.id}
+                        type="button"
+                        onClick={() => setPaymentMethod(pm.id)}
+                        className={`p-3.5 rounded-2xl border-2 text-left transition-all cursor-pointer flex items-start gap-3 ${
+                          isSelected
+                            ? 'border-[#F37021] bg-orange-50/40'
+                            : 'border-stone-200 hover:border-stone-300'
+                        }`}
+                      >
+                        <span
+                          className={`mt-0.5 shrink-0 ${
+                            isSelected ? 'text-[#F37021]' : 'text-stone-400'
+                          }`}
+                        >
+                          {pm.icon}
+                        </span>
+                        <div>
+                          <span className="text-xs font-bold text-[#231812] block">{pm.title}</span>
+                          <span className="text-[11px] text-stone-500 leading-snug block mt-0.5">
+                            {pm.desc}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             <button
               type="submit"
-              className="w-full py-4 px-6 rounded-2xl bg-[#F37021] hover:bg-[#D95D14] text-white font-bold text-base shadow-lg shadow-[#F37021]/25 transition-all cursor-pointer lg:hidden"
+              disabled={
+                createOrderMutation.isPending || !isAuthenticated || hasStockError || isCheckingStock
+              }
+              className="w-full py-4 px-6 rounded-2xl bg-[#F37021] hover:bg-[#D95D14] disabled:bg-stone-300 disabled:text-stone-500 text-white font-bold text-base shadow-lg shadow-[#F37021]/25 transition-all cursor-pointer lg:hidden flex items-center justify-center gap-2"
             >
-              {t.checkoutPage.confirmBtn} ({formatVND(total)})
+              {createOrderMutation.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>
+                {createOrderMutation.isPending
+                  ? t.checkoutPage.submittingBtn
+                  : `${t.checkoutPage.confirmBtn} (${formatVND(displayTotal)})`}
+              </span>
             </button>
           </form>
 
@@ -377,36 +647,72 @@ export default function CheckoutPage() {
                 <h2 className="font-display text-lg font-bold text-[#231812]">
                   {t.checkoutPage.summaryHeading} ({safeItems.length} {t.cart.itemsUnit})
                 </h2>
+                {isCheckingStock && (
+                  <span className="text-[11px] text-stone-500 inline-flex items-center gap-1">
+                    <Loader2 className="w-3 h-3 animate-spin text-[#F37021]" />
+                    {t.checkoutPage.checkingStock}
+                  </span>
+                )}
               </div>
 
+              {hasStockError && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 font-medium flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{t.checkoutPage.stockErrorNotice}</span>
+                </div>
+              )}
+
               <div className="space-y-3.5 max-h-80 overflow-y-auto pr-1">
-                {safeItems.map(({ product, quantity }) => {
-                  const badge = getStorageBadge(product.storageType, locale);
-                  const img =
-                    product.images && product.images.length > 0
-                      ? product.images[0]
-                      : BRAND_ASSETS.heroImage;
+                {safeItems.map((item) => {
+                  const badge = getStorageBadge(item.storageType, locale);
+                  const img = item.image || BRAND_ASSETS.heroImage;
+                  const itemName = getLocalizedProductName(item, locale);
+                  const stockInfo = stockIssues[item.productId];
+
                   return (
-                    <div key={product.id} className="flex items-center gap-3">
-                      <img
-                        src={img}
-                        alt={product.name}
-                        className="w-14 h-14 rounded-xl object-cover border border-stone-200 shrink-0 bg-stone-50"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-[#231812] truncate">{product.name}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span
-                            className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badge.className}`}
-                          >
-                            {badge.shortLabel}
-                          </span>
-                          <span className="text-[11px] text-stone-500">x{quantity}</span>
+                    <div key={item.productId} className="space-y-1.5 pb-3 border-b border-stone-100 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={img}
+                          alt={itemName}
+                          className="w-14 h-14 rounded-xl object-cover border border-stone-200 shrink-0 bg-stone-50"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-[#231812] truncate">{itemName}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.5 rounded border ${badge.className}`}
+                            >
+                              {badge.shortLabel}
+                            </span>
+                            <span className="text-[11px] text-stone-500">x{item.quantity}</span>
+                          </div>
                         </div>
+                        <span className="text-xs font-bold text-[#231812] shrink-0">
+                          {formatVND(item.price * item.quantity)}
+                        </span>
                       </div>
-                      <span className="text-xs font-bold text-[#231812] shrink-0">
-                        {formatVND(product.price * quantity)}
-                      </span>
+
+                      {stockInfo && (
+                        <div className="pl-17 text-[11px]">
+                          {stockInfo.available === 0 ? (
+                            <span className="text-red-600 font-semibold flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              {t.checkoutPage.outOfStockBranch}
+                            </span>
+                          ) : stockInfo.insufficient ? (
+                            <span className="text-red-600 font-semibold flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              {t.checkoutPage.insufficientStock} {stockInfo.available})
+                            </span>
+                          ) : (
+                            <span className="text-emerald-700 font-medium flex items-center gap-1">
+                              <PackageCheck className="w-3 h-3" />
+                              {t.checkoutPage.inStockLabel} {stockInfo.available}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -420,27 +726,39 @@ export default function CheckoutPage() {
                 <div className="flex justify-between text-stone-600">
                   <span>{t.checkoutPage.shippingFee}</span>
                   <span className="font-bold text-[#231812]">
-                    {deliveryMethod === 'PICKUP'
+                    {deliveryType === 'PICKUP'
                       ? t.checkoutPage.freePickup
                       : formatVND(shippingFee)}
                   </span>
                 </div>
                 <div className="flex justify-between text-base font-black text-[#231812] pt-3 border-t border-stone-200">
                   <span>{t.checkoutPage.grandTotal}</span>
-                  <span className="text-[#F37021]">{formatVND(total)}</span>
+                  <span className="text-[#F37021]">{formatVND(displayTotal)}</span>
                 </div>
               </div>
 
               <button
                 type="button"
+                disabled={
+                  createOrderMutation.isPending || !isAuthenticated || hasStockError || isCheckingStock
+                }
                 onClick={(e) => {
                   const form = e.currentTarget.closest('.grid')?.querySelector('form');
                   form?.requestSubmit();
                 }}
-                className="hidden lg:flex w-full py-3.5 px-6 rounded-2xl bg-[#F37021] hover:bg-[#D95D14] text-white font-bold text-sm shadow-lg shadow-[#F37021]/25 transition-all items-center justify-center gap-2 cursor-pointer"
+                className="hidden lg:flex w-full py-3.5 px-6 rounded-2xl bg-[#F37021] hover:bg-[#D95D14] disabled:bg-stone-300 disabled:text-stone-500 text-white font-bold text-sm shadow-lg shadow-[#F37021]/25 transition-all items-center justify-center gap-2 cursor-pointer"
               >
-                <span>{t.checkoutPage.confirmBtn}</span>
-                <ArrowRight className="w-4 h-4" />
+                {createOrderMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>{t.checkoutPage.submittingBtn}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{t.checkoutPage.confirmBtn}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </div>
           </div>

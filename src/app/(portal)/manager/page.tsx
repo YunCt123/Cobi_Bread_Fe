@@ -21,7 +21,8 @@ import {
 import { useAuthStore } from '@/stores/auth.store';
 import { branchesApi, authApi } from '@/lib/api';
 import { Branch } from '@/types';
-import { BRAND_ASSETS } from '@/data/cobi-content';
+import { ManagerNav } from '@/components/ManagerNav';
+import { ClipboardList, Boxes, ArrowRight } from 'lucide-react';
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
@@ -71,50 +72,7 @@ export default function ManagerDashboardPage() {
 
   return (
     <div className="min-h-screen bg-stone-100 flex flex-col">
-      {/* Top Navigation Bar */}
-      <header className="bg-white border-b border-stone-200 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            
-            {/* Brand & Portal Title */}
-            <div className="flex items-center gap-3">
-              <img
-                src={BRAND_ASSETS.logo}
-                alt="COBI BREAD"
-                className="h-8 w-auto object-contain shrink-0"
-              />
-              <div className="hidden sm:block pl-3 border-l border-stone-200">
-                <span className="text-sm font-bold text-[#231812] leading-tight block">
-                  Manager Portal
-                </span>
-                <span className="text-xs text-[#6E5C50] font-medium">
-                  Trang quản trị vận hành chi nhánh
-                </span>
-              </div>
-            </div>
-
-            {/* Right actions */}
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 transition-colors"
-              >
-                <Store className="w-3.5 h-3.5 text-[#F37021]" />
-                <span>Xem Cửa Hàng</span>
-              </Link>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 transition-colors"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Đăng xuất</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <ManagerNav />
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -183,6 +141,49 @@ export default function ManagerDashboardPage() {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Quick Actions for Milestone 3 */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <Link
+            href="/manager/orders"
+            className="group bg-white p-6 rounded-2xl border border-stone-200 hover:border-[#F37021] shadow-2xs transition-all flex items-center justify-between gap-4"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-orange-50 text-[#F37021] flex items-center justify-center shrink-0">
+                <ClipboardList className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-stone-900 group-hover:text-[#F37021] transition-colors">
+                  Xử Lý Đơn Hàng Chi Nhánh
+                </h2>
+                <p className="text-xs text-stone-500 mt-1">
+                  Xem đơn mới theo thời gian thực (15s), chuyển trạng thái xác nhận, chế biến và giao bánh.
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-stone-400 group-hover:text-[#F37021] shrink-0" />
+          </Link>
+
+          <Link
+            href="/manager/inventory"
+            className="group bg-white p-6 rounded-2xl border border-stone-200 hover:border-[#F37021] shadow-2xs transition-all flex items-center justify-between gap-4"
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+                <Boxes className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-stone-900 group-hover:text-[#F37021] transition-colors">
+                  Quản Lý Kho Lô Hàng FEFO
+                </h2>
+                <p className="text-xs text-stone-500 mt-1">
+                  Theo dõi cảnh báo hạn dùng (Đỏ ≤ 24h, Vàng ≤ 2 ngày, Xanh còn hạn) và nhập lô hàng mới.
+                </p>
+              </div>
+            </div>
+            <ArrowRight className="w-5 h-5 text-stone-400 group-hover:text-[#F37021] shrink-0" />
+          </Link>
         </div>
 
         {/* Operational Overview Metrics */}

@@ -28,6 +28,7 @@ export default function AdminCategoriesPage() {
 
   const [formData, setFormData] = useState({
     name: '',
+    nameEn: '',
     slug: '',
     displayOrder: 1,
     parentId: '',
@@ -41,7 +42,7 @@ export default function AdminCategoriesPage() {
   // Queries
   const { data: categories = [], isLoading } = useQuery<Category[]>({
     queryKey: ['categories'],
-    queryFn: categoriesApi.getAll,
+    queryFn: () => categoriesApi.getAll(),
   });
 
   // Mutations
@@ -90,6 +91,7 @@ export default function AdminCategoriesPage() {
     setEditingCategory(null);
     setFormData({
       name: '',
+      nameEn: '',
       slug: '',
       displayOrder: (categories.length || 0) + 1,
       parentId: '',
@@ -101,6 +103,7 @@ export default function AdminCategoriesPage() {
     setEditingCategory(cat);
     setFormData({
       name: cat.name,
+      nameEn: cat.nameEn || '',
       slug: cat.slug,
       displayOrder: cat.displayOrder,
       parentId: cat.parentId || '',
@@ -118,6 +121,7 @@ export default function AdminCategoriesPage() {
 
     const payload: CreateCategoryInput = {
       name: formData.name.trim(),
+      nameEn: formData.nameEn.trim() || undefined,
       slug: formData.slug.trim() || undefined,
       displayOrder: Number(formData.displayOrder),
       parentId: formData.parentId || undefined,
@@ -207,7 +211,12 @@ export default function AdminCategoriesPage() {
 
                       {/* Name */}
                       <td className="px-5 py-4 font-bold text-stone-900">
-                        {cat.name}
+                        <span className="block">{cat.name}</span>
+                        {cat.nameEn && (
+                          <span className="block text-[11px] font-medium text-stone-400 mt-0.5">
+                            EN: {cat.nameEn}
+                          </span>
+                        )}
                       </td>
 
                       {/* Slug */}
@@ -321,7 +330,7 @@ export default function AdminCategoriesPage() {
             <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Tên danh mục *
+                  Tên danh mục (Tiếng Việt) *
                 </label>
                 <input
                   type="text"
@@ -329,6 +338,19 @@ export default function AdminCategoriesPage() {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="VD: Bánh Mì Kem Tươi"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                  Tên danh mục (Tiếng Anh - nameEn)
+                </label>
+                <input
+                  type="text"
+                  value={formData.nameEn}
+                  onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                  placeholder="e.g. Fresh Cream Bread"
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500"
                 />
               </div>

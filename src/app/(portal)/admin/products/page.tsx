@@ -46,6 +46,7 @@ export default function AdminProductsPage() {
   const [formData, setFormData] = useState({
     sku: '',
     name: '',
+    nameEn: '',
     categoryId: '',
     price: 30000,
     netWeightG: 75,
@@ -54,7 +55,9 @@ export default function AdminProductsPage() {
     shelfLifeFrozenDays: 30,
     isB2b: false,
     ingredients: '',
+    ingredientsEn: '',
     description: '',
+    descriptionEn: '',
     imageUrl: BRAND_ASSETS.heroImage,
     energyKcal: 280,
     carbsG: 32,
@@ -70,7 +73,7 @@ export default function AdminProductsPage() {
   // Queries
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['categories'],
-    queryFn: categoriesApi.getAll,
+    queryFn: () => categoriesApi.getAll(),
   });
 
   const { data: productsData, isLoading, isError } = useQuery({
@@ -94,6 +97,7 @@ export default function AdminProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       queryClient.invalidateQueries({ queryKey: ['home-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       showToast('Thêm sản phẩm mới thành công!');
       closeModal();
     },
@@ -109,6 +113,7 @@ export default function AdminProductsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin-products'] });
       queryClient.invalidateQueries({ queryKey: ['home-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
       showToast('Cập nhật sản phẩm thành công!');
       closeModal();
     },
@@ -138,6 +143,7 @@ export default function AdminProductsPage() {
     setFormData({
       sku: `CB-${Date.now().toString().slice(-6)}`,
       name: '',
+      nameEn: '',
       categoryId: categories[0]?.id || '',
       price: 30000,
       netWeightG: 75,
@@ -146,7 +152,9 @@ export default function AdminProductsPage() {
       shelfLifeFrozenDays: 30,
       isB2b: false,
       ingredients: 'Bột mì, sữa tươi, bơ lạt, men tự nhiên, đường, muối.',
+      ingredientsEn: '',
       description: '',
+      descriptionEn: '',
       imageUrl: BRAND_ASSETS.heroImage,
       energyKcal: 280,
       carbsG: 32,
@@ -161,6 +169,7 @@ export default function AdminProductsPage() {
     setFormData({
       sku: p.sku,
       name: p.name,
+      nameEn: p.nameEn || '',
       categoryId: p.categoryId,
       price: p.price,
       netWeightG: p.netWeightG,
@@ -169,7 +178,9 @@ export default function AdminProductsPage() {
       shelfLifeFrozenDays: p.shelfLifeFrozenDays ?? 0,
       isB2b: p.isB2b,
       ingredients: p.ingredients,
+      ingredientsEn: p.ingredientsEn || '',
       description: p.description || '',
+      descriptionEn: p.descriptionEn || '',
       imageUrl: p.images?.[0] || BRAND_ASSETS.heroImage,
       energyKcal: p.nutritionJson?.energyKcal ?? 280,
       carbsG: p.nutritionJson?.carbsG ?? 32,
@@ -190,6 +201,7 @@ export default function AdminProductsPage() {
     const payload: CreateProductInput = {
       sku: formData.sku.trim().toUpperCase(),
       name: formData.name.trim(),
+      nameEn: formData.nameEn.trim() || undefined,
       categoryId: formData.categoryId,
       price: Number(formData.price),
       netWeightG: Number(formData.netWeightG),
@@ -199,7 +211,9 @@ export default function AdminProductsPage() {
         formData.storageType === 'FROZEN' ? Number(formData.shelfLifeFrozenDays) : null,
       isB2b: Boolean(formData.isB2b),
       ingredients: formData.ingredients.trim(),
+      ingredientsEn: formData.ingredientsEn.trim() || undefined,
       description: formData.description.trim() || undefined,
+      descriptionEn: formData.descriptionEn.trim() || undefined,
       images: [formData.imageUrl.trim()],
       nutritionJson: {
         energyKcal: Number(formData.energyKcal),
@@ -350,11 +364,16 @@ export default function AdminProductsPage() {
                             <Link
                               href={`/products/${p.slug}`}
                               target="_blank"
-                              className="font-bold text-stone-900 hover:text-purple-700 transition-colors line-clamp-1"
+                              className="font-bold text-stone-900 hover:text-purple-700 transition-colors line-clamp-1 block"
                             >
                               {p.name}
                             </Link>
-                            <span className="text-[11px] text-stone-400 font-mono">
+                            {p.nameEn && (
+                              <span className="text-[11px] text-purple-700 font-medium block line-clamp-1">
+                                EN: {p.nameEn}
+                              </span>
+                            )}
+                            <span className="text-[11px] text-stone-400 font-mono block">
                               /{p.slug}
                             </span>
                           </div>
@@ -507,10 +526,10 @@ export default function AdminProductsPage() {
                   />
                 </div>
 
-                {/* Name */}
+                {/* Name (VI) */}
                 <div>
                   <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Tên sản phẩm *
+                    Tên sản phẩm (Tiếng Việt) *
                   </label>
                   <input
                     type="text"
@@ -521,6 +540,20 @@ export default function AdminProductsPage() {
                     className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500"
                   />
                 </div>
+              </div>
+
+              {/* Name (EN) */}
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                  Tên sản phẩm tiếng Anh (nameEn)
+                </label>
+                <input
+                  type="text"
+                  value={formData.nameEn}
+                  onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                  placeholder="e.g. Cheese Fresh Cream Bread 75g"
+                  className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -661,33 +694,63 @@ export default function AdminProductsPage() {
                 />
               </div>
 
-              {/* Ingredients */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Thành phần nguyên liệu & Dị ứng *
-                </label>
-                <textarea
-                  required
-                  rows={2}
-                  value={formData.ingredients}
-                  onChange={(e) => setFormData({ ...formData, ingredients: e.target.value })}
-                  placeholder="Liệt kê thành phần: bột mì, sữa tươi, phô mai... Cảnh báo dị ứng..."
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs"
-                />
+              {/* Ingredients VI & EN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                    Thành phần nguyên liệu & Dị ứng (VI) *
+                  </label>
+                  <textarea
+                    required
+                    rows={2}
+                    value={formData.ingredients}
+                    onChange={(e) => setFormData({ ...formData, ingredients: e.target.value })}
+                    placeholder="Liệt kê thành phần: bột mì, sữa tươi, phô mai..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                    Thành phần tiếng Anh (ingredientsEn)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.ingredientsEn}
+                    onChange={(e) => setFormData({ ...formData, ingredientsEn: e.target.value })}
+                    placeholder="Wheat flour, fresh milk, cream cheese, butter..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs"
+                  />
+                </div>
               </div>
 
-              {/* Description */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Mô tả sản phẩm
-                </label>
-                <textarea
-                  rows={2}
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Mô tả hương vị, đặc điểm nổi bật..."
-                  className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs"
-                />
+              {/* Description VI & EN */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                    Mô tả sản phẩm (VI)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Mô tả hương vị, đặc điểm nổi bật..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                    Mô tả tiếng Anh (descriptionEn)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={formData.descriptionEn}
+                    onChange={(e) => setFormData({ ...formData, descriptionEn: e.target.value })}
+                    placeholder="Product flavor profile and highlights in English..."
+                    className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs"
+                  />
+                </div>
               </div>
 
               {/* Nutrition Summary (Quick fields) */}
