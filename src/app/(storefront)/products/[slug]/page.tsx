@@ -2,267 +2,272 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  ChevronRight, 
-  Thermometer, 
-  Snowflake, 
-  Sun, 
-  Scale, 
-  Clock, 
-  AlertTriangle, 
-  ShieldCheck, 
-  ShoppingBag, 
-  CheckCircle2, 
-  ArrowLeft, 
-  Store, 
-  Heart, 
-  Share2, 
-  Truck, 
-  Flame, 
-  Info,
-  Loader2
+import {
+  ChevronRight,
+  Thermometer,
+  Snowflake,
+  Scale,
+  Clock,
+  ShoppingBag,
+  AlertTriangle,
+  Sparkles,
+  CheckCircle2,
+  Minus,
+  Plus,
+  Loader2,
+  Briefcase,
+  Truck,
+  ShieldCheck,
 } from 'lucide-react';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
 import { productsApi } from '@/lib/api';
 import { Product } from '@/types';
+import { useCartStore } from '@/stores/cart.store';
 import { formatVND, getStorageBadge } from '@/components/ProductCard';
+import { BRAND_ASSETS } from '@/data/cobi-content';
+import {
+  useTranslation,
+  getLocalizedProductName,
+  getLocalizedProductDescription,
+  getLocalizedProductIngredients,
+  getLocalizedCategoryName,
+} from '@/i18n';
 
 export default function ProductDetailPage() {
-  const router = useRouter();
   const params = useParams();
-  const slug = params?.slug as string;
+  const slug = params.slug as string;
+  const { addItem } = useCartStore();
+  const { t, locale } = useTranslation();
 
-  const [quantity, setQuantity] = useState<number>(1);
-  const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [selectedImageIdx, setSelectedImageIdx] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [addedFeedback, setAddedFeedback] = useState(false);
 
-  // Fetch product by slug
-  const { data: product, isLoading, error } = useQuery<Product>({
-    queryKey: ['product', slug],
-    queryFn: () => productsApi.getBySlug(slug),
+  const { data: product, isLoading, isError } = useQuery<Product>({
+    queryKey: ['product', slug, locale],
+    queryFn: () => productsApi.getBySlug(slug, locale),
     enabled: Boolean(slug),
   });
 
-  const handleAddToCart = () => {
-    if (!product) return;
-    setToastMessage(`Đã thêm ${quantity} x "${product.name}" vào giỏ hàng thành công!`);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3500);
-  };
-
   if (isLoading) {
     return (
-      <div className="min-h-screen flex flex-col bg-stone-50">
-        <Header />
-        <div className="flex-1 flex items-center justify-center py-20">
-          <div className="flex items-center gap-2 text-stone-500 font-semibold text-sm">
-            <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
-            <span>Đang tải thông tin bánh...</span>
-          </div>
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center py-20">
+        <div className="flex flex-col items-center gap-3 text-stone-500">
+          <Loader2 className="w-8 h-8 animate-spin text-[#F37021]" />
+          <p className="text-sm font-semibold">{t.productDetail.loadingText}</p>
         </div>
-        <Footer />
       </div>
     );
   }
 
-  if (error || !product) {
+  if (isError || !product) {
     return (
-      <div className="min-h-screen flex flex-col bg-stone-50">
-        <Header />
-        <div className="flex-1 max-w-xl mx-auto px-4 py-20 text-center space-y-4">
-          <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-            <Store className="w-8 h-8" />
-          </div>
-          <h2 className="text-2xl font-bold text-stone-900">
-            Không tìm thấy sản phẩm
+      <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center p-6">
+        <div className="bg-white rounded-3xl p-8 max-w-md text-center space-y-4 border border-stone-200 shadow-xs">
+          <h2 className="font-display text-xl font-bold text-[#231812]">
+            {t.productDetail.notFoundTitle}
           </h2>
-          <p className="text-sm text-stone-500">
-            Sản phẩm có thể đã đổi tên hoặc tạm thời ngừng kinh doanh.
-          </p>
+          <p className="text-xs text-stone-500">{t.productDetail.notFoundDesc}</p>
           <Link
             href="/products"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 text-white font-bold text-xs hover:bg-amber-700"
+            className="inline-block px-6 py-2.5 rounded-full bg-[#F37021] text-white text-xs font-bold hover:bg-[#D95D14]"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Quay lại thực đơn bánh</span>
+            {t.productDetail.backToMenu}
           </Link>
         </div>
-        <Footer />
       </div>
     );
   }
 
-  const images = product.images && product.images.length > 0
-    ? product.images
-    : ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=1000&auto=format&fit=crop'];
-
-  const storageInfo = getStorageBadge(product.storageType);
+  const images =
+    product.images && product.images.length > 0 ? product.images : [BRAND_ASSETS.heroImage];
+  const storageInfo = getStorageBadge(product.storageType, locale);
   const nutrition = product.nutritionJson;
+  const productName = getLocalizedProductName(product, locale);
+  const productDesc = getLocalizedProductDescription(product, locale);
+  const productIngredients = getLocalizedProductIngredients(product, locale);
+  const categoryName = getLocalizedCategoryName(product.category, locale);
+
+  const handleAddToCart = () => {
+    addItem(product, quantity);
+    setAddedFeedback(true);
+    setTimeout(() => setAddedFeedback(false), 2500);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-stone-50">
-      <Header />
-
-      {/* Floating Add to Cart Toast */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-5 py-3.5 rounded-2xl shadow-2xl flex items-center gap-3 text-xs sm:text-sm font-semibold border border-stone-800 animate-in fade-in slide-in-from-bottom-4 duration-200">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
-
-      <main className="flex-1 py-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          
-          {/* Breadcrumbs */}
-          <nav className="flex items-center gap-2 text-xs text-stone-500">
-            <Link href="/" className="hover:text-amber-700">Trang chủ</Link>
-            <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
-            <Link href="/products" className="hover:text-amber-700">Sản phẩm</Link>
-            {product.category && (
-              <>
-                <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
-                <Link
-                  href={`/products?categorySlug=${product.category.slug}`}
-                  className="hover:text-amber-700"
-                >
-                  {product.category.name}
-                </Link>
-              </>
-            )}
-            <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
-            <span className="text-stone-900 font-semibold truncate max-w-xs sm:max-w-md">
-              {product.name}
+    <div className="bg-[#FAF7F2] min-h-screen py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        {/* Toast feedback */}
+        {addedFeedback && (
+          <div className="fixed bottom-6 right-6 z-40 bg-[#231812] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold border border-white/10 animate-in fade-in slide-in-from-bottom-5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span>
+              {t.productDetail.addedToastPrefix} {quantity} {t.productDetail.addedToastMid}{' '}
+              {productName} {t.productDetail.addedToastSuffix}
             </span>
-          </nav>
+          </div>
+        )}
 
-          {/* Product Overview: Gallery & Purchasing Box */}
-          <div className="bg-white rounded-3xl border border-stone-200 shadow-sm p-6 sm:p-10 grid grid-cols-1 lg:grid-cols-12 gap-10">
-            
-            {/* Left Col: Image Gallery (5 cols) */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* Main Image */}
-              <div className="relative aspect-square w-full rounded-3xl overflow-hidden bg-stone-100 border border-stone-200 shadow-inner">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-xs text-stone-500 flex-wrap">
+          <Link href="/" className="hover:text-[#F37021] transition-colors">
+            {t.common.home}
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5" />
+          <Link href="/products" className="hover:text-[#F37021] transition-colors">
+            {t.common.products}
+          </Link>
+          {product.category && (
+            <>
+              <ChevronRight className="w-3.5 h-3.5" />
+              <Link
+                href={`/products?categorySlug=${product.category.slug}`}
+                className="hover:text-[#F37021] transition-colors"
+              >
+                {categoryName}
+              </Link>
+            </>
+          )}
+          <ChevronRight className="w-3.5 h-3.5" />
+          <span className="font-semibold text-[#231812] truncate">{productName}</span>
+        </nav>
+
+        {/* Top Grid: Product Images + Main Overview */}
+        <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-10 shadow-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+            {/* LEFT: Image Gallery */}
+            <div className="space-y-4">
+              <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden bg-stone-100 border border-stone-200/60 relative">
                 <img
-                  src={images[activeImageIndex] || images[0]}
-                  alt={product.name}
+                  src={images[selectedImageIdx]}
+                  alt={productName}
                   className="w-full h-full object-cover object-center"
                 />
 
-                {/* Storage Condition Overlay Badge */}
+                {/* Top Storage Badge overlay */}
                 <div className="absolute top-4 left-4">
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border shadow-xs backdrop-blur-md ${storageInfo.className}`}>
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border shadow-sm backdrop-blur-md ${storageInfo.className}`}
+                  >
                     {storageInfo.icon}
                     <span>{storageInfo.label}</span>
                   </span>
                 </div>
-
-                {/* B2B pill */}
-                {product.isB2b && (
-                  <div className="absolute top-4 right-4">
-                    <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-600 text-white shadow-xs uppercase">
-                      B2B Sỉ
-                    </span>
-                  </div>
-                )}
               </div>
 
-              {/* Thumbnails if multiple images */}
               {images.length > 1 && (
-                <div className="flex gap-3 overflow-x-auto pb-1">
-                  {images.map((img, idx) => (
+                <div className="grid grid-cols-4 gap-3">
+                  {images.map((imgUrl, idx) => (
                     <button
                       key={idx}
                       type="button"
-                      onClick={() => setActiveImageIndex(idx)}
-                      className={`relative w-20 h-20 rounded-2xl overflow-hidden shrink-0 border-2 transition-all ${
-                        activeImageIndex === idx ? 'border-amber-600 scale-105' : 'border-stone-200 opacity-70 hover:opacity-100'
+                      onClick={() => setSelectedImageIdx(idx)}
+                      className={`aspect-square rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        selectedImageIdx === idx
+                          ? 'border-[#F37021] shadow-md scale-[1.02]'
+                          : 'border-stone-200 opacity-70 hover:opacity-100'
                       }`}
                     >
-                      <img src={img} alt={`thumb-${idx}`} className="w-full h-full object-cover" />
+                      <img
+                        src={imgUrl}
+                        alt={`${product.name} ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
                     </button>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Right Col: Details, Price, Shelf-Life & Add to Cart (7 cols) */}
-            <div className="lg:col-span-7 flex flex-col justify-between space-y-6">
+            {/* RIGHT: Key Details & Add to Cart */}
+            <div className="flex flex-col justify-between space-y-6">
               <div className="space-y-4">
-                {/* Category & SKU */}
-                <div className="flex items-center justify-between text-xs text-stone-500">
-                  <Link
-                    href={`/products?categorySlug=${product.category?.slug}`}
-                    className="font-bold text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg hover:bg-amber-100 transition-colors"
-                  >
-                    {product.category?.name}
-                  </Link>
-                  <span className="font-mono text-stone-400">
-                    Mã SKU: <strong className="text-stone-700">{product.sku}</strong>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[#F37021] bg-orange-50 px-3 py-1 rounded-full border border-orange-200">
+                    {categoryName}
+                  </span>
+                  {product.isB2b && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1 rounded-full bg-blue-50 text-blue-800 border border-blue-200">
+                      <Briefcase className="w-3 h-3" />
+                      <span>{t.productCard.b2bBadge}</span>
+                    </span>
+                  )}
+                  <span className="text-xs font-mono text-stone-400">
+                    {t.productDetail.skuPrefix} {product.sku}
                   </span>
                 </div>
 
-                {/* Title */}
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-stone-900 tracking-tight leading-tight">
-                  {product.name}
+                <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#231812] leading-tight">
+                  {productName}
                 </h1>
 
-                {/* Price & Net Weight */}
-                <div className="flex flex-wrap items-baseline gap-4 pt-2">
-                  <span className="text-3xl sm:text-4xl font-extrabold text-amber-700 tracking-tight">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-3xl font-black text-[#F37021]">
                     {formatVND(product.price)}
                   </span>
-                  <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-stone-100 text-stone-700 text-xs font-semibold">
-                    <Scale className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Khối lượng tịnh: <strong>{product.netWeightG}g</strong></span>
-                  </div>
+                  <span className="text-xs text-stone-500 font-medium flex items-center gap-1">
+                    <Scale className="w-3.5 h-3.5" />
+                    {t.productDetail.netWeightLabel}{' '}
+                    <strong className="text-[#231812]">{product.netWeightG}g</strong>
+                  </span>
                 </div>
 
-                {/* Description */}
-                {product.description && (
-                  <p className="text-sm text-stone-600 leading-relaxed pt-2">
-                    {product.description}
+                {productDesc && (
+                  <p className="text-sm text-stone-600 leading-relaxed pt-2 border-t border-stone-100">
+                    {productDesc}
                   </p>
                 )}
 
-                {/* Shelf-Life & Storage Conditions Card */}
-                <div className="p-4 rounded-2xl bg-amber-50/70 border border-amber-200/80 space-y-2.5">
-                  <span className="text-xs font-bold uppercase tracking-wider text-amber-900 flex items-center gap-1.5">
-                    <Clock className="w-4 h-4 text-amber-700" />
-                    Hướng Dẫn Bảo Quản & Hạn Sử Dụng
-                  </span>
-                  
+                {/* Storage Guidelines Cards */}
+                <div className="bg-[#FAF7F2] rounded-2xl p-4 border border-stone-200/80 space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#231812] flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-[#F37021]" />
+                    <span>{t.productDetail.storageGuideTitle}</span>
+                  </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
-                      <Thermometer className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
-                      <div>
-                        <strong className="text-stone-900 block">Bảo quản mát (0 - 10°C)</strong>
-                        <span className="text-stone-600">
-                          Sử dụng tốt nhất trong <strong className="text-emerald-700">{product.shelfLifeChilledDays} ngày</strong>.
-                        </span>
-                      </div>
-                    </div>
-
-                    {product.shelfLifeFrozenDays ? (
-                      <div className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
-                        <Snowflake className="w-4 h-4 text-cyan-600 mt-0.5 shrink-0" />
+                    {product.shelfLifeChilledDays && (
+                      <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200 flex items-start gap-2.5">
+                        <Thermometer className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
                         <div>
-                          <strong className="text-stone-900 block">Bảo quản đông sâu (-18°C)</strong>
-                          <span className="text-stone-600">
-                            Hạn dùng lên đến <strong className="text-cyan-700">{product.shelfLifeFrozenDays} ngày</strong>.
+                          <span className="font-bold text-emerald-900 block">
+                            {t.productDetail.chilledTitle}
+                          </span>
+                          <span className="text-emerald-700">
+                            {t.productDetail.chilledPre}{' '}
+                            <strong>
+                              {product.shelfLifeChilledDays} {t.productDetail.daysUnit}
+                            </strong>
                           </span>
                         </div>
                       </div>
-                    ) : (
-                      <div className="flex items-start gap-2 bg-white/80 p-2.5 rounded-xl border border-amber-100">
-                        <Flame className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                    )}
+
+                    {product.shelfLifeFrozenDays && (
+                      <div className="bg-cyan-50/70 p-3 rounded-xl border border-cyan-200 flex items-start gap-2.5">
+                        <Snowflake className="w-4 h-4 text-cyan-700 mt-0.5 shrink-0" />
                         <div>
-                          <strong className="text-stone-900 block">Thưởng thức nóng</strong>
-                          <span className="text-stone-600">Dùng ngay sau khi nướng để trọn vị giòn.</span>
+                          <span className="font-bold text-cyan-900 block">
+                            {t.productDetail.frozenTitle}
+                          </span>
+                          <span className="text-cyan-700">
+                            {t.productDetail.frozenPre}{' '}
+                            <strong>
+                              {product.shelfLifeFrozenDays} {t.productDetail.daysUnit}
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {!product.shelfLifeChilledDays && !product.shelfLifeFrozenDays && (
+                      <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 flex items-start gap-2.5 col-span-2">
+                        <Sparkles className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
+                        <div>
+                          <span className="font-bold text-amber-900 block">
+                            {t.productDetail.hotServeTitle}
+                          </span>
+                          <span className="text-amber-700">{t.productDetail.hotServeDesc}</span>
                         </div>
                       </div>
                     )}
@@ -270,150 +275,139 @@ export default function ProductDetailPage() {
                 </div>
               </div>
 
-              {/* Quantity Selector & Add to Cart Button */}
-              <div className="pt-6 border-t border-stone-200 space-y-4">
-                <div className="flex items-center gap-4">
-                  {/* Counter */}
-                  <div className="flex items-center border border-stone-300 rounded-2xl bg-stone-50 overflow-hidden">
+              {/* Quantity & Add To Cart Action */}
+              <div className="pt-4 border-t border-stone-100 space-y-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                  {/* Qty Selector */}
+                  <div className="flex items-center justify-between border border-stone-300 rounded-xl bg-white px-2 py-1.5 w-full sm:w-36">
                     <button
                       type="button"
                       onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                      className="px-3.5 py-3 hover:bg-stone-200 text-stone-700 font-bold transition-colors"
+                      aria-label="Decrease quantity"
+                      className="p-1.5 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                     >
-                      -
+                      <Minus className="w-4 h-4" />
                     </button>
-                    <span className="w-12 text-center font-bold text-sm text-stone-900">
-                      {quantity}
-                    </span>
+                    <span className="font-bold text-sm text-[#231812]">{quantity}</span>
                     <button
                       type="button"
                       onClick={() => setQuantity((q) => q + 1)}
-                      className="px-3.5 py-3 hover:bg-stone-200 text-stone-700 font-bold transition-colors"
+                      aria-label="Increase quantity"
+                      className="p-1.5 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
                     >
-                      +
+                      <Plus className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Add to Cart CTA */}
+                  {/* Add To Cart Button */}
                   <button
                     type="button"
                     onClick={handleAddToCart}
-                    className="flex-1 py-3.5 px-6 rounded-2xl bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-extrabold text-sm sm:text-base transition-all shadow-md shadow-amber-600/30 flex items-center justify-center gap-2"
+                    className="flex-1 py-3.5 px-6 rounded-xl bg-[#F37021] hover:bg-[#D95D14] text-white font-bold text-sm shadow-lg shadow-[#F37021]/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <ShoppingBag className="w-5 h-5" />
-                    <span>Thêm vào giỏ ({formatVND(product.price * quantity)})</span>
+                    <span>
+                      {t.productDetail.addToCartBtn} • {formatVND(product.price * quantity)}
+                    </span>
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between text-xs text-stone-500 pt-1">
-                  <span className="flex items-center gap-1.5">
-                    <Truck className="w-4 h-4 text-amber-600" />
-                    Giao hàng nhanh từ 5 chi nhánh Cobi Bread
+                <div className="flex items-center gap-4 text-[11px] text-stone-500">
+                  <span className="flex items-center gap-1">
+                    <Truck className="w-3.5 h-3.5 text-[#F37021]" />
+                    {t.productDetail.fastShipping}
                   </span>
-                  <span className="flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                    Đảm bảo tươi mới 100%
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    {t.productDetail.freshGuarantee}
                   </span>
                 </div>
               </div>
-            </div>
-          </div>
-
-          {/* Detailed Info: Ingredients, Nutrition & Allergen Warning */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            {/* Ingredients & Allergens (7 cols) */}
-            <div className="lg:col-span-7 bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-2xs space-y-5">
-              <h3 className="text-xl font-bold text-stone-900 flex items-center gap-2 border-b border-stone-100 pb-4">
-                <Info className="w-5 h-5 text-amber-600" />
-                Thành Phần & Cảnh Báo Dị Ứng
-              </h3>
-
-              <div className="text-sm text-stone-700 leading-relaxed space-y-4">
-                <div>
-                  <h4 className="font-bold text-stone-900 text-xs uppercase tracking-wider mb-1.5">
-                    Thành phần nguyên liệu
-                  </h4>
-                  <p className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                    {product.ingredients}
-                  </p>
-                </div>
-
-                {/* Allergen Warning Pill */}
-                <div className="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-3">
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                  <div className="text-xs leading-relaxed">
-                    <strong className="block font-bold">Lưu ý quan trọng cho khách hàng dị ứng:</strong>
-                    Sản phẩm được chế biến trong xưởng bánh có sử dụng lúa mì (gluten), trứng, sữa, đậu nành và các loại hạt.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Nutrition Facts Table (5 cols) */}
-            <div className="lg:col-span-5 bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-2xs space-y-5">
-              <h3 className="text-xl font-bold text-stone-900 flex items-center gap-2 border-b border-stone-100 pb-4">
-                <Scale className="w-5 h-5 text-emerald-600" />
-                Bảng Giá Trị Dinh Dưỡng
-              </h3>
-
-              {nutrition ? (
-                <div className="border border-stone-200 rounded-2xl overflow-hidden divide-y divide-stone-100 text-xs sm:text-sm">
-                  <div className="bg-stone-50 px-4 py-2.5 font-bold text-stone-700 flex justify-between">
-                    <span>Thành phần dinh dưỡng</span>
-                    <span>Trên 1 khẩu phần ({product.netWeightG}g)</span>
-                  </div>
-
-                  {nutrition.energyKcal !== undefined && (
-                    <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="font-semibold text-stone-800">Năng lượng (Calories)</span>
-                      <strong className="text-amber-700 font-bold">{nutrition.energyKcal} kcal</strong>
-                    </div>
-                  )}
-
-                  {nutrition.carbsG !== undefined && (
-                    <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-stone-700">Carbohydrate (Đường bột)</span>
-                      <span className="font-semibold text-stone-900">{nutrition.carbsG} g</span>
-                    </div>
-                  )}
-
-                  {nutrition.proteinG !== undefined && (
-                    <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-stone-700">Chất đạm (Protein)</span>
-                      <span className="font-semibold text-stone-900">{nutrition.proteinG} g</span>
-                    </div>
-                  )}
-
-                  {nutrition.fatG !== undefined && (
-                    <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-stone-700">Chất béo (Total Fat)</span>
-                      <span className="font-semibold text-stone-900">{nutrition.fatG} g</span>
-                    </div>
-                  )}
-
-                  {nutrition.sodiumMg !== undefined && (
-                    <div className="px-4 py-3 flex justify-between items-center">
-                      <span className="text-stone-700">Natri (Sodium)</span>
-                      <span className="font-semibold text-stone-900">{nutrition.sodiumMg} mg</span>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-xs text-stone-500 bg-stone-50 rounded-2xl p-4">
-                  Đang cập nhật bảng chỉ số dinh dưỡng chi tiết từ phòng kiểm nghiệm Cobi Bread.
-                </div>
-              )}
-
-              <p className="text-[11px] text-stone-500 italic">
-                * Giá trị dinh dưỡng hàng ngày dựa trên chế độ ăn 2.000 calo tiêu chuẩn.
-              </p>
             </div>
           </div>
         </div>
-      </main>
 
-      <Footer />
+        {/* Bottom Details Grid: Ingredients & Allergens + Nutrition Facts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* LEFT: Ingredients & Allergen Warning */}
+          <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs space-y-5">
+            <h2 className="font-display text-lg font-bold text-[#231812] flex items-center gap-2 border-b border-stone-100 pb-3">
+              <Sparkles className="w-5 h-5 text-[#F37021]" />
+              <span>{t.productDetail.ingredientsTitle}</span>
+            </h2>
+
+            <div className="space-y-3">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                {t.productDetail.ingredientsSubtitle}
+              </h3>
+              <p className="text-sm text-stone-700 leading-relaxed bg-[#FAF7F2] p-4 rounded-2xl border border-stone-200/50">
+                {productIngredients}
+              </p>
+            </div>
+
+            <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-900 space-y-1 leading-relaxed">
+                <span className="font-bold block">{t.productDetail.allergenHeading}</span>
+                <p>{t.productDetail.allergenBody}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT: Nutrition Facts Table */}
+          <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 shadow-xs space-y-5">
+            <h2 className="font-display text-lg font-bold text-[#231812] border-b border-stone-100 pb-3">
+              {t.productDetail.nutritionTitle}
+            </h2>
+
+            {nutrition ? (
+              <div className="border-2 border-[#231812] rounded-2xl overflow-hidden text-xs">
+                <div className="bg-[#231812] text-white px-4 py-2.5 flex justify-between font-bold uppercase tracking-wider">
+                  <span>{t.productDetail.nutritionCol1}</span>
+                  <span>
+                    {t.productDetail.nutritionCol2Prefix} ({product.netWeightG}g)
+                  </span>
+                </div>
+
+                <div className="divide-y divide-stone-200 bg-white">
+                  <div className="px-4 py-3 flex justify-between items-center font-bold text-sm">
+                    <span>{t.productDetail.calories}</span>
+                    <span className="text-[#F37021] font-mono">
+                      {nutrition.energyKcal ?? '-'} kcal
+                    </span>
+                  </div>
+
+                  <div className="px-4 py-2.5 flex justify-between items-center text-stone-700">
+                    <span>{t.productDetail.carbs}</span>
+                    <span className="font-semibold font-mono">{nutrition.carbsG ?? '-'} g</span>
+                  </div>
+
+                  <div className="px-4 py-2.5 flex justify-between items-center text-stone-700">
+                    <span>{t.productDetail.protein}</span>
+                    <span className="font-semibold font-mono">{nutrition.proteinG ?? '-'} g</span>
+                  </div>
+
+                  <div className="px-4 py-2.5 flex justify-between items-center text-stone-700">
+                    <span>{t.productDetail.fat}</span>
+                    <span className="font-semibold font-mono">{nutrition.fatG ?? '-'} g</span>
+                  </div>
+
+                  <div className="px-4 py-2.5 flex justify-between items-center text-stone-700">
+                    <span>{t.productDetail.sodium}</span>
+                    <span className="font-semibold font-mono">{nutrition.sodiumMg ?? '-'} mg</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-stone-50 rounded-2xl p-6 text-center text-xs text-stone-500">
+                {t.productDetail.nutritionPending}
+              </div>
+            )}
+
+            <p className="text-[11px] text-stone-400 italic">{t.productDetail.nutritionFootnote}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

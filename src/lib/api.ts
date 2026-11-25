@@ -1,10 +1,10 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import Cookies from 'js-cookie';
 import { useAuthStore, COOKIE_TOKEN_KEY } from '@/stores/auth.store';
-import { 
-  Branch, 
-  User, 
-  AuthLoginResponse, 
+import {
+  Branch,
+  User,
+  AuthLoginResponse,
   AuthRegisterResponse,
   Category,
   CreateCategoryInput,
@@ -13,7 +13,13 @@ import {
   ProductsResponse,
   QueryProductParams,
   CreateProductInput,
-  UpdateProductInput
+  UpdateProductInput,
+  InventoryBatch,
+  CreateInventoryBatchInput,
+  ProductAvailability,
+  Order,
+  OrderStatus,
+  CreateOrderInput,
 } from '@/types';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
@@ -64,7 +70,11 @@ export const authApi = {
     return data;
   },
 
-  register: async (payload: { email: string; password: string; fullName: string }): Promise<AuthRegisterResponse> => {
+  register: async (payload: {
+    email: string;
+    password: string;
+    fullName: string;
+  }): Promise<AuthRegisterResponse> => {
     const { data } = await api.post<AuthRegisterResponse>('/auth/register', payload);
     return data;
   },
@@ -77,26 +87,34 @@ export const authApi = {
 
 // Branches API
 export const branchesApi = {
-  getBranches: async (): Promise<Branch[]> => {
-    const { data } = await api.get<Branch[]>('/branches');
+  getBranches: async (lang?: 'vi' | 'en'): Promise<Branch[]> => {
+    const { data } = await api.get<Branch[]>('/branches', {
+      params: lang ? { lang } : undefined,
+    });
     return data;
   },
 
-  getBranchById: async (id: string): Promise<Branch> => {
-    const { data } = await api.get<Branch>(`/branches/${id}`);
+  getBranchById: async (id: string, lang?: 'vi' | 'en'): Promise<Branch> => {
+    const { data } = await api.get<Branch>(`/branches/${id}`, {
+      params: lang ? { lang } : undefined,
+    });
     return data;
   },
 };
 
 // Categories API
 export const categoriesApi = {
-  getAll: async (): Promise<Category[]> => {
-    const { data } = await api.get<Category[]>('/categories');
+  getAll: async (lang?: 'vi' | 'en'): Promise<Category[]> => {
+    const { data } = await api.get<Category[]>('/categories', {
+      params: lang ? { lang } : undefined,
+    });
     return data;
   },
 
-  getById: async (id: string): Promise<Category> => {
-    const { data } = await api.get<Category>(`/categories/${id}`);
+  getById: async (id: string, lang?: 'vi' | 'en'): Promise<Category> => {
+    const { data } = await api.get<Category>(`/categories/${id}`, {
+      params: lang ? { lang } : undefined,
+    });
     return data;
   },
 
@@ -123,8 +141,10 @@ export const productsApi = {
     return data;
   },
 
-  getBySlug: async (slug: string): Promise<Product> => {
-    const { data } = await api.get<Product>(`/products/${slug}`);
+  getBySlug: async (slug: string, lang?: 'vi' | 'en'): Promise<Product> => {
+    const { data } = await api.get<Product>(`/products/${slug}`, {
+      params: lang ? { lang } : undefined,
+    });
     return data;
   },
 
@@ -140,6 +160,49 @@ export const productsApi = {
 
   delete: async (id: string): Promise<{ message: string }> => {
     const { data } = await api.delete<{ message: string }>(`/products/${id}`);
+    return data;
+  },
+};
+
+// Inventory API (Milestone 3 FEFO)
+export const inventoryApi = {
+  getAvailability: async (branchId: string, productId: string): Promise<ProductAvailability> => {
+    const { data } = await api.get<ProductAvailability>('/inventory/availability', {
+      params: { branchId, productId },
+    });
+    return data;
+  },
+
+  getBatches: async (params?: { branchId?: string; productId?: string }): Promise<InventoryBatch[]> => {
+    const { data } = await api.get<InventoryBatch[]>('/inventory/batches', { params });
+    return data;
+  },
+
+  createBatch: async (payload: CreateInventoryBatchInput): Promise<InventoryBatch> => {
+    const { data } = await api.post<InventoryBatch>('/inventory/batches', payload);
+    return data;
+  },
+};
+
+// Orders API (Milestone 3)
+export const ordersApi = {
+  create: async (payload: CreateOrderInput): Promise<Order> => {
+    const { data } = await api.post<Order>('/orders', payload);
+    return data;
+  },
+
+  getMyOrders: async (): Promise<Order[]> => {
+    const { data } = await api.get<Order[]>('/orders/my-orders');
+    return data;
+  },
+
+  getAll: async (params?: { branchId?: string; status?: OrderStatus }): Promise<Order[]> => {
+    const { data } = await api.get<Order[]>('/orders', { params });
+    return data;
+  },
+
+  updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
+    const { data } = await api.patch<Order>(`/orders/${id}/status`, { status });
     return data;
   },
 };

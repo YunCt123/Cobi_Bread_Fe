@@ -1,134 +1,212 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Briefcase, 
-  Snowflake, 
-  CheckCircle2, 
-  Truck, 
-  Coffee, 
-  Hotel, 
-  ShoppingBag, 
-  ArrowRight,
+import {
+  Briefcase,
+  Truck,
   Phone,
-  Mail,
-  ShieldCheck
+  Coffee,
+  Building2,
+  Loader2,
+  ExternalLink,
+  ZoomIn,
+  ShieldCheck,
+  ArrowRight,
 } from 'lucide-react';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
-import ProductCard from '@/components/ProductCard';
 import { productsApi } from '@/lib/api';
+import { Product } from '@/types';
+import ProductCard from '@/components/ProductCard';
+import { BRAND_ASSETS } from '@/data/cobi-content';
+import ImageLightboxModal from '@/components/ImageLightboxModal';
+import { useTranslation } from '@/i18n';
 
-export default function B2BPage() {
-  const { data: b2bData, isLoading } = useQuery({
-    queryKey: ['b2b-products'],
-    queryFn: () => productsApi.getAll({ isB2b: true, limit: 20 }),
+export default function B2bPage() {
+  const { t, locale } = useTranslation();
+  const [isDiagramZoomed, setIsDiagramZoomed] = useState(false);
+
+  const { data: productData, isLoading } = useQuery({
+    queryKey: ['b2b-products', locale],
+    queryFn: () => productsApi.getAll({ isB2b: true, limit: 12, lang: locale }),
   });
 
-  const b2bProducts = b2bData?.data || [];
+  const b2bProducts: Product[] = productData?.data || [];
 
   return (
-    <div className="min-h-screen flex flex-col bg-stone-50">
-      <Header />
+    <div className="bg-[#FAF7F2] min-h-screen">
+      {/* B2B Hero Banner */}
+      <section className="bg-[#231812] text-white py-14 sm:py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/20 text-xs font-bold text-[#F37021]">
+            <Briefcase className="w-3.5 h-3.5" />
+            <span>{t.b2bPage.badge}</span>
+          </div>
 
-      <main className="flex-1">
-        {/* B2B Hero */}
-        <section className="bg-gradient-to-b from-blue-900 to-stone-900 text-white py-16 sm:py-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-6">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-500/20 text-blue-300 border border-blue-400/30">
-              <Briefcase className="w-3.5 h-3.5" />
-              Giải Pháp Bán Sỉ & Cung Ứng Bánh Mì Cobi Bread
-            </span>
-            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-tight max-w-4xl mx-auto">
-              Cung Cấp Bánh Mì Tươi & Đông Lạnh Cho Chuỗi Cà Phê, Khách Sạn & Nhà Hàng
-            </h1>
-            <p className="text-sm sm:text-base text-stone-300 max-w-2xl mx-auto font-normal leading-relaxed">
-              Giải pháp tối ưu chi phí vận hành: 100% bánh cấp đông sâu -18°C, bảo quản 30-45 ngày, rã đông và nướng giòn chỉ 3 phút, hương vị thơm ngon đồng nhất.
+          <h1 className="font-display text-3xl sm:text-5xl font-bold max-w-3xl leading-tight">
+            {t.b2bPage.heroTitle}
+          </h1>
+
+          <p className="text-sm sm:text-base text-stone-300 max-w-2xl leading-relaxed">
+            {t.b2bPage.heroDesc}
+          </p>
+
+          <div className="flex flex-wrap items-center gap-4 pt-2">
+            <a
+              href="tel:0909459387"
+              className="px-6 py-3.5 rounded-full bg-[#F37021] hover:bg-[#D95D14] text-white font-bold text-sm shadow-lg shadow-[#F37021]/25 transition-all inline-flex items-center gap-2"
+            >
+              <Phone className="w-4 h-4" />
+              <span>{t.b2bPage.callHcm}</span>
+            </a>
+
+            <a
+              href="tel:0982219841"
+              className="px-6 py-3.5 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-sm border border-white/20 transition-all inline-flex items-center gap-2"
+            >
+              <Phone className="w-4 h-4" />
+              <span>{t.b2bPage.callHn}</span>
+            </a>
+
+            <a
+              href={BRAND_ASSETS.flipbookUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-5 py-3.5 rounded-full bg-white text-[#231812] hover:bg-orange-50 font-bold text-sm transition-all inline-flex items-center gap-2"
+            >
+              <span>{t.b2bPage.viewCatalogue}</span>
+              <ExternalLink className="w-4 h-4 text-[#F37021]" />
+            </a>
+          </div>
+        </div>
+      </section>
+
+      {/* Benefits Grid */}
+      <section className="py-14 bg-white border-b border-stone-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-stone-200/80 space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-orange-100 text-[#F37021] flex items-center justify-center">
+              <Coffee className="w-5 h-5" />
+            </div>
+            <h3 className="font-display text-lg font-bold text-[#231812]">{t.b2bPage.card1Title}</h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+              {t.b2bPage.card1Desc}
             </p>
+          </div>
 
-            <div className="pt-2 flex flex-wrap justify-center gap-3">
-              <a
-                href="tel:02854117799"
-                className="px-6 py-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-sm transition-all shadow-lg shadow-amber-600/30 flex items-center gap-2"
-              >
-                <Phone className="w-4 h-4" />
-                <span>Liên hệ Báo Giá B2B: 028 5411 7799</span>
-              </a>
+          <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-stone-200/80 space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-800 flex items-center justify-center">
+              <Building2 className="w-5 h-5" />
+            </div>
+            <h3 className="font-display text-lg font-bold text-[#231812]">{t.b2bPage.card2Title}</h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+              {t.b2bPage.card2Desc}
+            </p>
+          </div>
+
+          <div className="p-6 rounded-3xl bg-[#FAF7F2] border border-stone-200/80 space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+              <Truck className="w-5 h-5" />
+            </div>
+            <h3 className="font-display text-lg font-bold text-[#231812]">{t.b2bPage.card3Title}</h3>
+            <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
+              {t.b2bPage.card3Desc}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Total Bakery Solutions Diagram */}
+      <section className="py-14 bg-[#FAF7F2] border-b border-stone-200/80">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-10 shadow-xs grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+            <div className="lg:col-span-5 space-y-4">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F37021]">
+                {t.b2bPage.diagramEyebrow}
+              </span>
+              <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#231812] leading-snug">
+                {t.b2bPage.diagramTitle}
+              </h2>
+              <p className="text-sm text-stone-600 leading-relaxed">{t.b2bPage.diagramDesc}</p>
               <Link
-                href="/products?isB2b=true"
-                className="px-6 py-3.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold text-sm transition-all"
+                href="/certificates"
+                className="inline-flex items-center gap-2 text-xs font-bold text-emerald-700 hover:text-[#F37021] hover:underline"
               >
-                Xem danh mục sản phẩm sỉ
+                <ShieldCheck className="w-4 h-4" />
+                <span>{t.b2bPage.viewCertsLink}</span>
+                <ArrowRight className="w-3.5 h-3.5" />
               </Link>
             </div>
-          </div>
-        </section>
 
-        {/* Benefits Grid */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Coffee className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-stone-900">Chuỗi Cà Phê & Trà Sữa</h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Không cần đầu tư bếp bánh hay thợ bánh chuyên nghiệp. Nhân viên chỉ cần nướng nóng bánh Pocket Toast, bánh que hoặc bánh mì kem tươi phục vụ khách.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Hotel className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-stone-900">Khách Sạn & Buffet Sáng</h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Cung ứng bánh mì sandwich ép viền, bánh mì que, bánh đông lạnh tiêu chuẩn 5 sao với sản lượng lớn và giao hàng lạnh hàng ngày.
-              </p>
-            </div>
-
-            <div className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Truck className="w-6 h-6" />
-              </div>
-              <h3 className="text-lg font-bold text-stone-900">Giao Hàng Lạnh Chuyên Dụng</h3>
-              <p className="text-xs text-stone-600 leading-relaxed">
-                Hệ thống xe thùng lạnh chuyên dụng vận chuyển đảm bảo nhiệt độ ổn định từ xưởng sản xuất Cobi Home Long Hậu đến kho của quý đối tác.
-              </p>
+            <div className="lg:col-span-7">
+              <button
+                type="button"
+                onClick={() => setIsDiagramZoomed(true)}
+                className="group relative w-full bg-[#FAF7F2] rounded-2xl border border-stone-200 p-4 cursor-zoom-in block"
+              >
+                <img
+                  src={BRAND_ASSETS.b2bSolutionsDiagram}
+                  alt={t.b2bPage.diagramTitle}
+                  className="w-full max-h-80 object-contain mx-auto"
+                  loading="lazy"
+                />
+                <span className="mt-2 inline-flex items-center gap-1.5 text-[11px] font-bold text-[#F37021]">
+                  <ZoomIn className="w-3.5 h-3.5" />
+                  {t.common.zoomDetail}
+                </span>
+              </button>
             </div>
           </div>
-        </section>
+        </div>
+      </section>
 
-        {/* B2B Products Catalog */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 border-t border-stone-200">
-          <div className="flex items-center justify-between mb-8">
+      {/* B2B Products Showcase */}
+      <section className="py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
-                Sản Phẩm Dành Cho Khách Hàng Doanh Nghiệp
+              <span className="text-xs font-bold uppercase tracking-widest text-[#F37021]">
+                {t.b2bPage.catalogEyebrow}
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-stone-900 mt-1">
-                Danh Mục Bánh Sỉ B2B Cobi Bread
+              <h2 className="font-display text-2xl sm:text-3xl font-bold text-[#231812] mt-1">
+                {t.b2bPage.catalogTitle}
               </h2>
             </div>
+
             <Link
               href="/products?isB2b=true"
-              className="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1"
+              className="text-xs font-bold text-[#F37021] hover:underline"
             >
-              Xem trên bộ lọc sản phẩm →
+              {t.b2bPage.viewFilterLink} →
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {b2bProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ))}
-          </div>
-        </section>
-      </main>
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-16 gap-3 text-stone-500">
+              <Loader2 className="w-8 h-8 animate-spin text-[#F37021]" />
+              <span className="text-xs font-semibold">{t.common.loading}</span>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {b2bProducts.map((product) => (
+                <ProductCard key={product.id} product={product} />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
-      <Footer />
+      <ImageLightboxModal
+        items={[
+          {
+            src: BRAND_ASSETS.b2bSolutionsDiagram,
+            title: t.b2bPage.diagramTitle,
+            category: t.b2bPage.diagramEyebrow,
+          },
+        ]}
+        currentIndex={isDiagramZoomed ? 0 : null}
+        onClose={() => setIsDiagramZoomed(false)}
+      />
     </div>
   );
 }

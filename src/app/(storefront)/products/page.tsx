@@ -2,415 +2,469 @@
 
 import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Search, 
-  Filter, 
-  X, 
-  Thermometer, 
-  Snowflake, 
-  Sun, 
-  Briefcase, 
-  Layers, 
-  Store, 
-  Loader2,
+import {
+  Search,
+  Filter,
+  X,
+  Thermometer,
+  Snowflake,
+  Sun,
+  Briefcase,
+  ChevronRight,
   SlidersHorizontal,
-  ChevronRight
+  Loader2,
 } from 'lucide-react';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
-import ProductCard from '@/components/ProductCard';
 import { categoriesApi, productsApi } from '@/lib/api';
 import { Category, Product, StorageType } from '@/types';
+import ProductCard from '@/components/ProductCard';
+import { useTranslation, getLocalizedCategoryName } from '@/i18n';
 
-function ProductsCatalogContent() {
+function ProductsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, locale } = useTranslation();
 
-  // Read URL query params
-  const initialCategory = searchParams.get('categorySlug') || '';
-  const initialStorage = (searchParams.get('storageType') as StorageType) || '';
-  const initialB2b = searchParams.get('isB2b') === 'true';
-  const initialSearch = searchParams.get('search') || '';
+  // Sync initial filters from URL
+  const categorySlugParam = searchParams.get('categorySlug') || '';
+  const storageTypeParam = (searchParams.get('storageType') as StorageType) || '';
+  const isB2bParam = searchParams.get('isB2b') === 'true';
+  const searchParam = searchParams.get('search') || '';
+  const pageParam = Number(searchParams.get('page')) || 1;
 
-  const [categorySlug, setCategorySlug] = useState<string>(initialCategory);
-  const [storageType, setStorageType] = useState<string>(initialStorage);
-  const [isB2b, setIsB2b] = useState<boolean>(initialB2b);
-  const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
-  const [page, setPage] = useState<number>(1);
+  const [localSearch, setLocalSearch] = useState(searchParam);
 
-  // Sync state if URL searchParams change
   useEffect(() => {
-    setCategorySlug(searchParams.get('categorySlug') || '');
-    setStorageType(searchParams.get('storageType') || '');
-    setIsB2b(searchParams.get('isB2b') === 'true');
-    setSearchTerm(searchParams.get('search') || '');
-  }, [searchParams]);
+    setLocalSearch(searchParam);
+  }, [searchParam]);
 
-  // Fetch categories for sidebar filter
+  // Fetch Categories with ?lang=
   const { data: categories = [] } = useQuery<Category[]>({
-    queryKey: ['categories'],
-    queryFn: categoriesApi.getAll,
+    queryKey: ['categories', locale],
+    queryFn: () => categoriesApi.getAll(locale),
   });
 
-  // Fetch products with filters
-  const { data: productsData, isLoading, isFetching } = useQuery({
-    queryKey: ['products-catalog', categorySlug, storageType, isB2b, searchTerm, page],
+  // Fetch Products based on query + ?lang=
+  const { data: productData, isLoading } = useQuery({
+    queryKey: [
+      'products',
+      locale,
+      categorySlugParam,
+      storageTypeParam,
+      isB2bParam,
+      searchParam,
+      pageParam,
+    ],
     queryFn: () =>
       productsApi.getAll({
-        categorySlug: categorySlug || undefined,
-        storageType: (storageType as StorageType) || undefined,
-        isB2b: isB2b ? true : undefined,
-        search: searchTerm || undefined,
-        page,
-        limit: 16,
+        categorySlug: categorySlugParam || undefined,
+        storageType: storageTypeParam || undefined,
+        isB2b: isB2bParam ? true : undefined,
+        search: searchParam || undefined,
+        page: pageParam,
+        limit: 12,
+        lang: locale,
       }),
   });
 
-  const products: Product[] = productsData?.data || [];
-  const meta = productsData?.meta;
+  const products: Product[] = productData?.data || [];
+  const meta = productData?.meta;
 
-  const handleClearFilters = () => {
-    setCategorySlug('');
-    setStorageType('');
-    setIsB2b(false);
-    setSearchTerm('');
-    setPage(1);
-    router.push('/products');
-  };
+  const updateFilters = (updates: Record<string, string | null | undefined>) => {
+    const params = new URLSearchParams(searchParams.toString());
 
-  const updateFilters = (newCat?: string, newStorage?: string, newB2b?: boolean) => {
-    setPage(1);
-    const cat = newCat !== undefined ? newCat : categorySlug;
-    const st = newStorage !== undefined ? newStorage : storageType;
-    const b2b = newB2b !== undefined ? newB2b : isB2b;
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '' || value === 'false') {
+        params.delete(key);
+      } else {
+        params.set(key, value);
+      }
+    });
 
-    const params = new URLSearchParams();
-    if (cat) params.set('categorySlug', cat);
-    if (st) params.set('storageType', st);
-    if (b2b) params.set('isB2b', 'true');
-    if (searchTerm) params.set('search', searchTerm);
+    if (!('page' in updates)) {
+      params.delete('page');
+    }
 
     router.push(`/products?${params.toString()}`);
   };
 
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateFilters({ search: localSearch.trim() || null });
+  };
+
+  const clearAllFilters = () => {
+    setLocalSearch('');
+    router.push('/products');
+  };
+
+  const activeCategoryObj = categories.find((c) => c.slug === categorySlugParam);
+  const activeCategoryDisplay = activeCategoryObj
+    ? getLocalizedCategoryName(activeCategoryObj, locale)
+    : categorySlugParam;
+
+  const hasAnyFilter = Boolean(categorySlugParam || storageTypeParam || isB2bParam || searchParam);
+
+  const storageFilterOptions: {
+    value: StorageType | '';
+    label: string;
+    icon: React.ReactNode;
+  }[] = [
+    { value: '', label: t.productsPage.allTemperatures, icon: null },
+    {
+      value: 'FRESH',
+      label: t.storage.freshFull,
+      icon: <Thermometer className="w-3.5 h-3.5 text-emerald-600" />,
+    },
+    {
+      value: 'FROZEN',
+      label: t.storage.frozenFull,
+      icon: <Snowflake className="w-3.5 h-3.5 text-cyan-600" />,
+    },
+    {
+      value: 'AMBIENT',
+      label: t.storage.ambientFull,
+      icon: <Sun className="w-3.5 h-3.5 text-amber-600" />,
+    },
+  ];
+
+  const getStorageChipLabel = (st: StorageType) => {
+    if (st === 'FRESH') return t.storage.freshFull;
+    if (st === 'FROZEN') return t.storage.frozenFull;
+    return t.storage.ambientFull;
+  };
+
   return (
-    <div className="min-h-screen flex flex-col bg-stone-50">
-      <Header />
+    <div className="bg-[#FAF7F2] min-h-screen py-8 sm:py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#F37021] transition-colors">
+            {t.common.home}
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5" />
+          <span className="font-semibold text-[#231812]">{t.productsPage.breadcrumb}</span>
+        </nav>
 
-      <main className="flex-1">
-        {/* Breadcrumb & Header Banner */}
-        <section className="bg-white border-b border-stone-200 py-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-2 text-xs text-stone-500 mb-2">
-              <Link href="/" className="hover:text-amber-700">Trang chủ</Link>
-              <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
-              <span className="text-stone-900 font-semibold">Thực đơn bánh Cobi Bread</span>
-            </div>
-
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-              <div>
-                <h1 className="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight">
-                  Danh Mục Bánh & Sản Phẩm
-                </h1>
-                <p className="text-sm text-stone-500 mt-1">
-                  Khám phá các dòng bánh nướng tươi ngon, bánh cấp đông chất lượng cao phục vụ tận tay
-                </p>
-              </div>
-
-              {/* Total count badge */}
-              <div className="text-xs text-stone-600 bg-stone-100 px-3.5 py-1.5 rounded-xl border border-stone-200 self-start md:self-auto font-medium">
-                Tìm thấy <strong className="text-amber-800 font-bold">{meta?.total ?? products.length}</strong> sản phẩm
-              </div>
-            </div>
+        {/* Title Header */}
+        <div className="bg-white rounded-3xl border border-stone-200/80 p-6 sm:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-xs">
+          <div>
+            <h1 className="font-display text-2xl sm:text-3xl font-bold text-[#231812] tracking-tight">
+              {t.productsPage.title}
+            </h1>
+            <p className="text-xs sm:text-sm text-stone-500 mt-1">
+              {t.productsPage.subtitle}
+            </p>
           </div>
-        </section>
+          {meta && (
+            <div className="text-xs font-semibold text-stone-600 bg-orange-50/70 px-4 py-2 rounded-full border border-orange-200/60 self-start md:self-center">
+              {t.productsPage.foundPrefix}{' '}
+              <span className="text-[#F37021] font-bold">{meta.total}</span>{' '}
+              {t.productsPage.foundSuffix}
+            </div>
+          )}
+        </div>
 
-        {/* Content Layout: Filter Sidebar + Products Grid */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 items-start">
-            
-            {/* Sidebar Filters */}
-            <aside className="bg-white p-6 rounded-3xl border border-stone-200 shadow-2xs space-y-6 lg:sticky lg:top-28">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-4">
-                <span className="text-sm font-bold text-stone-900 flex items-center gap-2">
-                  <SlidersHorizontal className="w-4 h-4 text-amber-600" />
-                  Bộ lọc sản phẩm
-                </span>
-                {(categorySlug || storageType || isB2b || searchTerm) && (
+        {/* Main Grid: Filters Sidebar + Catalog */}
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* LEFT SIDEBAR: Filters */}
+          <aside className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-3xl border border-stone-200/80 p-5 shadow-xs space-y-6 sticky top-24">
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <h3 className="text-sm font-bold text-[#231812] flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-[#F37021]" />
+                  <span>{t.productsPage.filterTitle}</span>
+                </h3>
+                {hasAnyFilter && (
                   <button
                     type="button"
-                    onClick={handleClearFilters}
-                    className="text-xs text-red-600 hover:underline font-semibold"
+                    onClick={clearAllFilters}
+                    className="text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
                   >
-                    Xóa tất cả
+                    {t.productsPage.clearAll}
                   </button>
                 )}
               </div>
 
-              {/* 1. Search Bar */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2">
-                  Tìm theo tên hoặc SKU
+              {/* Search by Name / SKU */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-stone-500">
+                  {t.productsPage.searchLabel}
                 </label>
-                <div className="relative">
-                  <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <form onSubmit={handleSearchSubmit} className="relative">
                   <input
                     type="text"
-                    placeholder="VD: Kem tươi, Pocket, CB-..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') updateFilters();
-                    }}
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl text-xs sm:text-sm border border-stone-300 focus:outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-200"
+                    value={localSearch}
+                    onChange={(e) => setLocalSearch(e.target.value)}
+                    placeholder={t.productsPage.searchInputPlaceholder}
+                    className="w-full pl-3 pr-9 py-2 rounded-xl border border-stone-200 bg-[#FAF7F2] text-xs focus:outline-none focus:border-[#F37021]"
                   />
-                </div>
+                  <button
+                    type="submit"
+                    aria-label={t.common.searchBtn}
+                    className="absolute right-2.5 top-2 text-stone-400 hover:text-[#F37021] cursor-pointer"
+                  >
+                    <Search className="w-4 h-4" />
+                  </button>
+                </form>
               </div>
 
-              {/* 2. Category Filter */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2.5">
-                  Danh mục sản phẩm
+              {/* Category Filter */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-stone-500 block">
+                  {t.productsPage.categoryLabel}
                 </label>
-                <div className="space-y-1">
+                <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
                   <button
                     type="button"
-                    onClick={() => updateFilters('', undefined, undefined)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center justify-between ${
-                      !categorySlug
-                        ? 'bg-amber-100/80 text-amber-900 font-bold'
-                        : 'text-stone-700 hover:bg-stone-100'
+                    onClick={() => updateFilters({ categorySlug: null })}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+                      !categorySlugParam
+                        ? 'bg-[#231812] text-white font-bold'
+                        : 'text-stone-700 hover:bg-orange-50'
                     }`}
                   >
-                    <span>Tất cả danh mục</span>
+                    {t.common.allCategories}
                   </button>
-
                   {categories.map((cat) => (
                     <button
                       key={cat.id}
                       type="button"
-                      onClick={() => updateFilters(cat.slug, undefined, undefined)}
-                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center justify-between ${
-                        categorySlug === cat.slug
-                          ? 'bg-amber-100/80 text-amber-900 font-bold'
-                          : 'text-stone-700 hover:bg-stone-100'
+                      onClick={() => updateFilters({ categorySlug: cat.slug })}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer flex items-center justify-between ${
+                        categorySlugParam === cat.slug
+                          ? 'bg-[#F37021] text-white font-bold shadow-xs'
+                          : 'text-stone-700 hover:bg-orange-50'
                       }`}
                     >
-                      <span className="truncate">{cat.name}</span>
+                      <span className="truncate">
+                        {getLocalizedCategoryName(cat, locale)}
+                      </span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* 3. Storage Type Filter */}
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-2.5">
-                  Điều kiện bảo quản
+              {/* Storage Condition Filter */}
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase tracking-wider text-stone-500 block">
+                  {t.productsPage.storageLabel}
                 </label>
                 <div className="space-y-1.5">
-                  <button
-                    type="button"
-                    onClick={() => updateFilters(undefined, '', undefined)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
-                      !storageType ? 'bg-amber-100/80 text-amber-900' : 'text-stone-700 hover:bg-stone-100'
-                    }`}
-                  >
-                    Tất cả nhiệt độ
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => updateFilters(undefined, 'FRESH', undefined)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
-                      storageType === 'FRESH'
-                        ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                        : 'text-stone-700 hover:bg-stone-100'
-                    }`}
-                  >
-                    <Thermometer className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Bánh tươi (0-10°C)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => updateFilters(undefined, 'FROZEN', undefined)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
-                      storageType === 'FROZEN'
-                        ? 'bg-cyan-100 text-cyan-900 border border-cyan-300'
-                        : 'text-stone-700 hover:bg-stone-100'
-                    }`}
-                  >
-                    <Snowflake className="w-3.5 h-3.5 text-cyan-600" />
-                    <span>Đông lạnh (-18°C)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => updateFilters(undefined, 'AMBIENT', undefined)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition-colors flex items-center gap-2 ${
-                      storageType === 'AMBIENT'
-                        ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                        : 'text-stone-700 hover:bg-stone-100'
-                    }`}
-                  >
-                    <Sun className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Nhiệt độ thường</span>
-                  </button>
+                  {storageFilterOptions.map((item) => (
+                    <button
+                      key={item.value || 'ALL'}
+                      type="button"
+                      onClick={() => updateFilters({ storageType: item.value || null })}
+                      className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-colors cursor-pointer ${
+                        storageTypeParam === item.value
+                          ? 'bg-[#231812] text-white font-bold'
+                          : 'bg-[#FAF7F2] text-stone-700 hover:bg-stone-200/60'
+                      }`}
+                    >
+                      {item.icon}
+                      <span>{item.label}</span>
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* 4. B2B Filter Toggle */}
+              {/* B2B Filter */}
               <div className="pt-2 border-t border-stone-100">
-                <label className="flex items-center gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={isB2b}
-                    onChange={(e) => updateFilters(undefined, undefined, e.target.checked)}
-                    className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-stone-300"
-                  />
-                  <div className="text-xs">
-                    <span className="font-bold text-stone-900 block">Sản phẩm sỉ B2B</span>
-                    <span className="text-[11px] text-stone-500">Dành cho quán cà phê, nhà hàng</span>
+                <button
+                  type="button"
+                  onClick={() => updateFilters({ isB2b: isB2bParam ? null : 'true' })}
+                  className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                    isB2bParam
+                      ? 'bg-blue-50 border-blue-300 text-blue-900 shadow-xs'
+                      : 'bg-white border-stone-200 text-stone-700 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Briefcase
+                      className={`w-4 h-4 ${isB2bParam ? 'text-blue-700' : 'text-stone-400'}`}
+                    />
+                    <div className="text-left">
+                      <span className="block">{t.productsPage.b2bLabel}</span>
+                      <span className="text-[10px] font-normal text-stone-500">
+                        {t.productsPage.b2bSub}
+                      </span>
+                    </div>
                   </div>
-                </label>
+                  <div
+                    className={`w-4 h-4 rounded-full border flex items-center justify-center ${
+                      isB2bParam ? 'border-blue-700 bg-blue-700' : 'border-stone-300'
+                    }`}
+                  >
+                    {isB2bParam && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                  </div>
+                </button>
               </div>
-            </aside>
-
-            {/* Products Grid & Pagination */}
-            <div className="lg:col-span-3 space-y-6">
-              
-              {/* Active Filter Chips */}
-              {(categorySlug || storageType || isB2b || searchTerm) && (
-                <div className="flex flex-wrap items-center gap-2 p-3 bg-white rounded-2xl border border-stone-200 text-xs">
-                  <span className="text-stone-500 font-medium">Đang lọc theo:</span>
-                  
-                  {categorySlug && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-100 text-amber-800 font-semibold">
-                      {categories.find((c) => c.slug === categorySlug)?.name || categorySlug}
-                      <button onClick={() => updateFilters('', undefined, undefined)}>
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-
-                  {storageType && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 text-stone-800 font-semibold">
-                      {storageType === 'FRESH' ? 'Bánh tươi 0-10°C' : storageType === 'FROZEN' ? 'Đông lạnh -18°C' : 'Nhiệt độ thường'}
-                      <button onClick={() => updateFilters(undefined, '', undefined)}>
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-
-                  {isB2b && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-100 text-blue-800 font-semibold">
-                      Bán sỉ B2B
-                      <button onClick={() => updateFilters(undefined, undefined, false)}>
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-
-                  {searchTerm && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-stone-100 text-stone-800 font-semibold">
-                      Từ khóa: &ldquo;{searchTerm}&rdquo;
-                      <button onClick={() => { setSearchTerm(''); updateFilters(); }}>
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  )}
-                </div>
-              )}
-
-              {/* Loading Skeleton */}
-              {isLoading && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[1, 2, 3, 4, 5, 6].map((i) => (
-                    <div key={i} className="h-80 rounded-3xl bg-white border border-stone-200 animate-pulse" />
-                  ))}
-                </div>
-              )}
-
-              {/* Products List */}
-              {!isLoading && products.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {products.map((product) => (
-                    <ProductCard key={product.id} product={product} />
-                  ))}
-                </div>
-              )}
-
-              {/* Empty State */}
-              {!isLoading && products.length === 0 && (
-                <div className="bg-white rounded-3xl p-12 text-center border border-stone-200 space-y-4">
-                  <div className="w-16 h-16 rounded-3xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto">
-                    <Search className="w-8 h-8" />
-                  </div>
-                  <h3 className="text-xl font-bold text-stone-900">
-                    Không tìm thấy sản phẩm nào
-                  </h3>
-                  <p className="text-xs sm:text-sm text-stone-500 max-w-md mx-auto">
-                    Không có sản phẩm nào khớp với tiêu chí lọc hiện tại. Hãy thử chọn danh mục khác hoặc xóa bộ lọc.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleClearFilters}
-                    className="px-5 py-2.5 rounded-xl bg-amber-600 text-white font-bold text-xs hover:bg-amber-700 transition-colors"
-                  >
-                    Xem lại tất cả sản phẩm
-                  </button>
-                </div>
-              )}
-
-              {/* Pagination Controls */}
-              {meta && meta.totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 pt-6">
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    className="px-4 py-2 rounded-xl bg-white border border-stone-200 text-xs font-semibold text-stone-700 disabled:opacity-50 hover:bg-stone-50"
-                  >
-                    Trang trước
-                  </button>
-                  <span className="text-xs text-stone-600 px-3 font-semibold">
-                    Trang {meta.page} / {meta.totalPages}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={page >= meta.totalPages}
-                    onClick={() => setPage((p) => Math.min(meta.totalPages, p + 1))}
-                    className="px-4 py-2 rounded-xl bg-white border border-stone-200 text-xs font-semibold text-stone-700 disabled:opacity-50 hover:bg-stone-50"
-                  >
-                    Trang sau
-                  </button>
-                </div>
-              )}
             </div>
-          </div>
-        </section>
-      </main>
+          </aside>
 
-      <Footer />
+          {/* RIGHT CATALOG GRID */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Active Filters Chips */}
+            {hasAnyFilter && (
+              <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-2xl border border-stone-200/80 text-xs">
+                <span className="text-stone-500 font-medium mr-1">
+                  {t.productsPage.filteringBy}
+                </span>
+                {categorySlugParam && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-orange-50 text-[#F37021] font-semibold border border-orange-200">
+                    <span>{activeCategoryDisplay}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateFilters({ categorySlug: null })}
+                      aria-label={t.common.close}
+                      className="cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {storageTypeParam && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-cyan-50 text-cyan-800 font-semibold border border-cyan-200">
+                    <span>{getStorageChipLabel(storageTypeParam)}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateFilters({ storageType: null })}
+                      aria-label={t.common.close}
+                      className="cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {isB2bParam && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-50 text-blue-800 font-semibold border border-blue-200">
+                    <span>{t.common.b2b}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateFilters({ isB2b: null })}
+                      aria-label={t.common.close}
+                      className="cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+                {searchParam && (
+                  <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-stone-100 text-stone-800 font-semibold">
+                    <span>
+                      {t.productsPage.keywordPrefix} &quot;{searchParam}&quot;
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLocalSearch('');
+                        updateFilters({ search: null });
+                      }}
+                      aria-label={t.common.close}
+                      className="cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Loading State */}
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-white rounded-3xl border border-stone-200/80 p-4 space-y-3 animate-pulse"
+                  >
+                    <div className="aspect-[4/3] bg-stone-200 rounded-2xl" />
+                    <div className="h-4 bg-stone-200 rounded w-3/4" />
+                    <div className="h-3 bg-stone-200 rounded w-1/2" />
+                    <div className="h-8 bg-stone-200 rounded-xl w-full mt-4" />
+                  </div>
+                ))}
+              </div>
+            ) : products.length === 0 ? (
+              /* Empty State */
+              <div className="bg-white rounded-3xl border border-stone-200/80 p-12 text-center space-y-4">
+                <div className="w-16 h-16 bg-orange-50 text-[#F37021] rounded-full flex items-center justify-center mx-auto">
+                  <Filter className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="font-display text-lg font-bold text-[#231812]">
+                    {t.productsPage.emptyTitle}
+                  </h3>
+                  <p className="text-xs text-stone-500 max-w-sm mx-auto">
+                    {t.productsPage.emptyDesc}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearAllFilters}
+                  className="px-6 py-2.5 rounded-full bg-[#F37021] text-white text-xs font-bold hover:bg-[#D95D14] cursor-pointer"
+                >
+                  {t.productsPage.resetFilters}
+                </button>
+              </div>
+            ) : (
+              /* Products Grid */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {products.map((product) => (
+                  <ProductCard key={product.id} product={product} />
+                ))}
+              </div>
+            )}
+
+            {/* Pagination */}
+            {meta && meta.totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-4">
+                <button
+                  type="button"
+                  disabled={meta.page <= 1}
+                  onClick={() => updateFilters({ page: String(meta.page - 1) })}
+                  className="px-4 py-2 rounded-xl border border-stone-200 bg-white text-xs font-bold text-stone-700 disabled:opacity-40 cursor-pointer hover:bg-orange-50"
+                >
+                  {t.common.previousPage}
+                </button>
+                <span className="text-xs font-bold text-stone-600 px-3">
+                  {t.common.pagePrefix} {meta.page} / {meta.totalPages}
+                </span>
+                <button
+                  type="button"
+                  disabled={meta.page >= meta.totalPages}
+                  onClick={() => updateFilters({ page: String(meta.page + 1) })}
+                  className="px-4 py-2 rounded-xl border border-stone-200 bg-white text-xs font-bold text-stone-700 disabled:opacity-40 cursor-pointer hover:bg-orange-50"
+                >
+                  {t.common.nextPage}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProductsSuspenseFallback() {
+  const { t } = useTranslation();
+  return (
+    <div className="min-h-screen bg-[#FAF7F2] flex items-center justify-center">
+      <div className="flex flex-col items-center gap-3 text-stone-500">
+        <Loader2 className="w-8 h-8 animate-spin text-[#F37021]" />
+        <span className="text-sm font-semibold">{t.productsPage.loadingMenu}</span>
+      </div>
     </div>
   );
 }
 
 export default function ProductsPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-stone-50 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-stone-500 text-sm font-semibold">
-            <Loader2 className="w-5 h-5 animate-spin text-amber-600" />
-            <span>Đang tải thực đơn bánh Cobi Bread...</span>
-          </div>
-        </div>
-      }
-    >
-      <ProductsCatalogContent />
+    <Suspense fallback={<ProductsSuspenseFallback />}>
+      <ProductsContent />
     </Suspense>
   );
 }

@@ -1,198 +1,245 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  Store, 
-  MapPin, 
-  Clock, 
-  Phone, 
-  CheckCircle2, 
-  ArrowRight, 
-  Navigation, 
-  Sparkles,
-  Building,
-  AlertCircle
+import {
+  MapPin,
+  Phone,
+  Clock,
+  CheckCircle2,
+  ExternalLink,
+  Store,
+  Loader2,
+  Navigation,
+  ChevronRight,
 } from 'lucide-react';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
 import { branchesApi } from '@/lib/api';
 import { Branch } from '@/types';
 import { useBranchStore } from '@/stores/branch.store';
+import { getBranchVisualMeta } from '@/data/cobi-content';
+import {
+  useTranslation,
+  getLocalizedBranchName,
+  getLocalizedBranchAddress,
+  getLocalizedBranchCity,
+} from '@/i18n';
 
 export default function StoresPage() {
+  const { t, locale } = useTranslation();
   const { selectedBranch, setSelectedBranch } = useBranchStore();
-  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const [justSelectedId, setJustSelectedId] = useState<string | null>(null);
 
-  const { data: branches = [], isLoading, error } = useQuery<Branch[]>({
-    queryKey: ['branches'],
-    queryFn: branchesApi.getBranches,
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const { data: branches = [], isLoading, isError } = useQuery<Branch[]>({
+    queryKey: ['branches', locale],
+    queryFn: () => branchesApi.getBranches(locale),
   });
 
-  const handleSelect = (branch: Branch) => {
+  const activeBranch = mounted ? selectedBranch : null;
+
+  const handleSelectBranch = (branch: Branch) => {
     setSelectedBranch(branch);
-    setSuccessToast(`Đã chọn chi nhánh: ${branch.name}`);
-    setTimeout(() => {
-      setSuccessToast(null);
-    }, 3000);
+    setJustSelectedId(branch.id);
+    setTimeout(() => setJustSelectedId(null), 2500);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-stone-50">
-      <Header />
-
-      <main className="flex-1">
-        {/* Banner */}
-        <section className="bg-gradient-to-b from-amber-500/10 via-amber-50/50 to-stone-50 py-12 border-b border-amber-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center space-y-4">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-200">
-              <Store className="w-3.5 h-3.5 text-amber-700" />
-              Điểm Đến Thưởng Thức Bánh Tươi
-            </span>
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-stone-900 tracking-tight">
-              Hệ Thống 5 Cửa Hàng Cobi Bread
-            </h1>
-            <p className="text-stone-600 text-sm sm:text-base max-w-2xl mx-auto">
-              Không gian tiệm bánh hiện đại, ấm cúng cùng lò nướng bánh tại chỗ phục vụ cư dân tại TP. Hồ Chí Minh, Hà Nội và Long An.
-            </p>
+    <div className="bg-[#FAF7F2] min-h-screen py-10 sm:py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        {/* Header Hero */}
+        <div className="text-center max-w-2xl mx-auto space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-xs font-bold text-[#F37021]">
+            <Store className="w-3.5 h-3.5" />
+            <span>{t.storesPage.badge}</span>
           </div>
-        </section>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#231812] tracking-tight">
+            {t.storesPage.title}
+          </h1>
+          <p className="text-sm text-stone-600 leading-relaxed">{t.storesPage.subtitle}</p>
+        </div>
 
-        {/* Selected Notification Toast */}
-        {successToast && (
-          <div className="fixed bottom-6 right-6 z-50 bg-emerald-700 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 text-sm font-semibold animate-in fade-in slide-in-from-bottom-3 duration-200">
-            <CheckCircle2 className="w-5 h-5 text-emerald-200" />
-            <span>{successToast}</span>
+        {/* Toast Feedback */}
+        {justSelectedId && (
+          <div className="fixed bottom-6 right-6 z-40 bg-[#231812] text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-2.5 text-xs font-bold animate-in fade-in slide-in-from-bottom-5">
+            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <span>
+              {t.storesPage.toastSelectedPrefix}{' '}
+              {activeBranch ? getLocalizedBranchName(activeBranch, locale) : ''}
+            </span>
           </div>
         )}
 
-        {/* 5 Branches Section */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          
-          {/* Active selection reminder banner */}
-          {selectedBranch && (
-            <div className="mb-8 p-5 rounded-3xl bg-amber-50/80 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-bold shrink-0">
-                  <CheckCircle2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-xs uppercase tracking-wider text-amber-800 font-bold">
-                    Chi nhánh bạn đang chọn đặt bánh
-                  </p>
-                  <p className="text-base font-bold text-stone-900">
-                    {selectedBranch.name} • <span className="font-normal text-stone-600">{selectedBranch.address}, {selectedBranch.city}</span>
-                  </p>
-                </div>
+        {/* Active Branch Reminder */}
+        {activeBranch && (
+          <div className="bg-white rounded-3xl border-2 border-[#F37021]/40 p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-orange-50 text-[#F37021] flex items-center justify-center shrink-0">
+                <Navigation className="w-5 h-5" />
               </div>
-              <Link
-                href="/products"
-                className="px-4 py-2 rounded-xl bg-amber-600 text-white hover:bg-amber-700 text-xs font-bold transition-all shrink-0 self-start sm:self-auto flex items-center gap-1.5"
-              >
-                <span>Đặt bánh từ chi nhánh này</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#F37021]">
+                  {t.storesPage.activeReminderLabel}
+                </span>
+                <h2 className="font-display text-lg font-bold text-[#231812]">
+                  {getLocalizedBranchName(activeBranch, locale)}
+                </h2>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  {getLocalizedBranchAddress(activeBranch, locale)}
+                  {activeBranch.city ? `, ${getLocalizedBranchCity(activeBranch, locale)}` : ''}
+                </p>
+              </div>
             </div>
-          )}
 
-          {/* Loading */}
-          {isLoading && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="h-64 rounded-3xl bg-white border border-stone-200 animate-pulse p-6 space-y-4" />
-              ))}
-            </div>
-          )}
+            <Link
+              href="/products"
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#F37021] hover:bg-[#D95D14] text-white text-xs font-bold transition-colors shrink-0 shadow-sm"
+            >
+              <span>{t.storesPage.orderFromBranch}</span>
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
 
-          {/* Error */}
-          {error && (
-            <div className="p-6 rounded-2xl bg-red-50 border border-red-200 text-red-700 flex items-center gap-3 text-sm">
-              <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
-              <span>Không thể kết nối đến máy chủ backend để lấy danh sách chi nhánh. Vui lòng kiểm tra cổng 3001.</span>
-            </div>
-          )}
+        {/* Loading & Error */}
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-stone-500">
+            <Loader2 className="w-8 h-8 animate-spin text-[#F37021]" />
+            <span className="text-sm font-semibold">{t.common.loading}</span>
+          </div>
+        ) : isError ? (
+          <div className="bg-white rounded-3xl p-8 text-center text-sm text-red-600 border border-red-200">
+            {t.common.backendError}
+          </div>
+        ) : (
+          /* 5 Branches Grid with Real Branch Photos + Embedded Google Maps */
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {branches.map((branch, index) => {
+              const isSelected = activeBranch?.id === branch.id;
+              const visualMeta = getBranchVisualMeta(branch);
+              const branchName = getLocalizedBranchName(branch, locale);
+              const branchAddress = getLocalizedBranchAddress(branch, locale);
+              const branchCity = getLocalizedBranchCity(branch, locale);
 
-          {/* Branches Cards */}
-          {!isLoading && !error && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {branches.map((branch) => {
-                const isSelected = selectedBranch?.id === branch.id;
-                return (
-                  <div
-                    key={branch.id}
-                    className={`rounded-3xl p-6 transition-all duration-300 flex flex-col justify-between border ${
-                      isSelected
-                        ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-400/20 shadow-lg'
-                        : 'bg-white border-stone-200 hover:border-amber-300 hover:shadow-md'
-                    }`}
-                  >
-                    <div>
-                      {/* Top Header Card */}
-                      <div className="flex items-start justify-between gap-3 mb-4">
-                        <span className={`inline-block text-xs font-bold px-3 py-1 rounded-full ${
-                          isSelected ? 'bg-amber-600 text-white' : 'bg-stone-100 text-stone-700'
-                        }`}>
-                          {branch.city}
+              return (
+                <div
+                  key={branch.id}
+                  className={`bg-white rounded-3xl border overflow-hidden transition-all flex flex-col justify-between shadow-xs ${
+                    isSelected
+                      ? 'border-[#F37021] ring-2 ring-[#F37021]/20'
+                      : 'border-stone-200/80 hover:border-[#F37021]/60'
+                  }`}
+                >
+                  {/* Real Branch Photo */}
+                  <div className="relative aspect-[16/9] w-full bg-stone-100 overflow-hidden border-b border-stone-100">
+                    <img
+                      src={visualMeta.image}
+                      alt={branchName}
+                      className="w-full h-full object-cover object-center"
+                      loading="lazy"
+                    />
+                    <div className="absolute top-4 left-4 flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-xl bg-[#231812]/90 text-white flex items-center justify-center font-bold text-xs shadow-md backdrop-blur-sm">
+                        0{index + 1}
+                      </span>
+                      {isSelected && (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-emerald-600 text-white text-[11px] font-bold shadow-md">
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>{t.storesPage.selectedTag}</span>
                         </span>
-
-                        {isSelected && (
-                          <span className="flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-100 px-2.5 py-1 rounded-full">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-amber-600" />
-                            Đang chọn
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="text-xl font-bold text-stone-900 leading-snug">
-                        {branch.name}
-                      </h3>
-
-                      <div className="mt-4 space-y-3 text-xs sm:text-sm text-stone-600">
-                        <div className="flex items-start gap-2.5">
-                          <MapPin className="w-4 h-4 text-stone-400 shrink-0 mt-0.5" />
-                          <span className="leading-relaxed">{branch.address}</span>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-                          <span className="font-semibold text-stone-800">{branch.openHours}</span>
-                        </div>
-                        <div className="flex items-center gap-2.5">
-                          <Phone className="w-4 h-4 text-stone-400 shrink-0" />
-                          <a href={`tel:${branch.phone}`} className="hover:text-amber-700 font-medium">
-                            {branch.phone}
-                          </a>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bottom Action Button */}
-                    <div className="mt-6 pt-4 border-t border-stone-100">
-                      {isSelected ? (
-                        <div className="w-full py-2.5 px-4 rounded-xl bg-amber-600 text-white text-xs font-bold flex items-center justify-center gap-2 shadow-xs">
-                          <CheckCircle2 className="w-4 h-4" />
-                          <span>Chi nhánh của bạn</span>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleSelect(branch)}
-                          className="w-full py-2.5 px-4 rounded-xl bg-stone-100 hover:bg-amber-600 hover:text-white text-stone-800 text-xs font-bold transition-all flex items-center justify-center gap-2"
-                        >
-                          <Navigation className="w-4 h-4" />
-                          <span>Chọn làm chi nhánh của tôi</span>
-                        </button>
                       )}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </main>
 
-      <Footer />
+                  {/* Branch Info + Google Maps Embed */}
+                  <div className="p-6 space-y-5 flex-1 flex flex-col justify-between">
+                    <div className="space-y-4">
+                      <div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                          COBI BREAD BAKERY CAFE
+                        </span>
+                        <h3 className="font-display text-xl font-bold text-[#231812] mt-0.5">
+                          {branchName}
+                        </h3>
+                      </div>
+
+                      <div className="space-y-2.5 text-xs text-stone-600">
+                        <p className="flex items-start gap-2.5">
+                          <MapPin className="w-4 h-4 text-[#F37021] shrink-0 mt-0.5" />
+                          <span className="leading-relaxed">
+                            {branchAddress}
+                            {branchCity ? `, ${branchCity}` : ''}
+                          </span>
+                        </p>
+
+                        <p className="flex items-center gap-2.5">
+                          <Phone className="w-4 h-4 text-[#F37021] shrink-0" />
+                          <a
+                            href={`tel:${branch.phone}`}
+                            className="font-bold text-[#231812] hover:text-[#F37021] hover:underline"
+                          >
+                            {branch.phone}
+                          </a>
+                        </p>
+
+                        <p className="flex items-center gap-2.5">
+                          <Clock className="w-4 h-4 text-[#F37021] shrink-0" />
+                          <span>{branch.openHours}</span>
+                        </p>
+                      </div>
+
+                      {/* Embedded Interactive Google Map */}
+                      <div className="rounded-2xl overflow-hidden border border-stone-200/80 bg-stone-100 h-48 relative">
+                        <iframe
+                          title={`${t.storesPage.mapTitlePrefix} ${branch.name}`}
+                          src={visualMeta.mapEmbedUrl}
+                          className="w-full h-full border-0"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="pt-4 border-t border-stone-100 flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectBranch(branch)}
+                        className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white shadow-xs'
+                            : 'bg-[#231812] hover:bg-stone-800 text-white'
+                        }`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>
+                          {isSelected
+                            ? t.storesPage.yourBranchBtn
+                            : t.storesPage.selectBranchBtn}
+                        </span>
+                      </button>
+
+                      <a
+                        href={visualMeta.googleMapsUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="py-2.5 px-4 rounded-xl border border-stone-200 hover:border-[#F37021] text-xs font-bold text-[#231812] hover:text-[#F37021] transition-colors inline-flex items-center gap-1.5"
+                      >
+                        <span>{t.storesPage.openInMaps}</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

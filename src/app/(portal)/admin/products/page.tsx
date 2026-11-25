@@ -24,6 +24,7 @@ import { AdminNav } from '@/components/AdminNav';
 import { productsApi, categoriesApi } from '@/lib/api';
 import { Product, Category, StorageType, CreateProductInput, UpdateProductInput } from '@/types';
 import { formatVND, getStorageBadge } from '@/components/ProductCard';
+import { BRAND_ASSETS } from '@/data/cobi-content';
 
 export default function AdminProductsPage() {
   const queryClient = useQueryClient();
@@ -54,7 +55,7 @@ export default function AdminProductsPage() {
     isB2b: false,
     ingredients: '',
     description: '',
-    imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop',
+    imageUrl: BRAND_ASSETS.heroImage,
     energyKcal: 280,
     carbsG: 32,
     proteinG: 6,
@@ -146,7 +147,7 @@ export default function AdminProductsPage() {
       isB2b: false,
       ingredients: 'Bột mì, sữa tươi, bơ lạt, men tự nhiên, đường, muối.',
       description: '',
-      imageUrl: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop',
+      imageUrl: BRAND_ASSETS.heroImage,
       energyKcal: 280,
       carbsG: 32,
       proteinG: 6,
@@ -169,7 +170,7 @@ export default function AdminProductsPage() {
       isB2b: p.isB2b,
       ingredients: p.ingredients,
       description: p.description || '',
-      imageUrl: p.images?.[0] || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop',
+      imageUrl: p.images?.[0] || BRAND_ASSETS.heroImage,
       energyKcal: p.nutritionJson?.energyKcal ?? 280,
       carbsG: p.nutritionJson?.carbsG ?? 32,
       proteinG: p.nutritionJson?.proteinG ?? 6,
@@ -341,7 +342,7 @@ export default function AdminProductsPage() {
                         {/* Image & Name */}
                         <td className="px-4 py-3.5 flex items-center gap-3">
                           <img
-                            src={p.images?.[0] || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=100&auto=format&fit=crop'}
+                            src={p.images?.[0] || BRAND_ASSETS.heroImage}
                             alt={p.name}
                             className="w-12 h-12 rounded-xl object-cover shrink-0 bg-stone-100 border border-stone-200"
                           />
@@ -652,10 +653,10 @@ export default function AdminProductsPage() {
                   URL Hình ảnh
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   value={formData.imageUrl}
                   onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                  placeholder="https://images.unsplash.com/..."
+                  placeholder="/cobi/introduce/DSC9528-5-1.png hoặc https://..."
                   className="w-full px-3 py-2 rounded-xl border border-stone-300 focus:outline-none focus:border-purple-500 text-xs font-mono"
                 />
               </div>
