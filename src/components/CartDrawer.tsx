@@ -1,0 +1,294 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { 
+  X, 
+  ShoppingBag, 
+  Trash2, 
+  Plus, 
+  Minus, 
+  AlertTriangle, 
+  ArrowRight, 
+  Store, 
+  Sparkles,
+  Thermometer,
+  Snowflake,
+  Sun,
+  ShieldCheck
+} from 'lucide-react';
+import { useCartStore } from '@/stores/cart.store';
+import { useBranchStore } from '@/stores/branch.store';
+import { formatVND, getStorageBadge } from '@/components/ProductCard';
+
+export default function CartDrawer() {
+  const router = useRouter();
+  const { 
+    items, 
+    isOpen, 
+    closeCart, 
+    updateQuantity, 
+    removeItem, 
+    clearCart,
+    getTotalItems, 
+    getTotalPrice, 
+    hasMixedStorage 
+  } = useCartStore();
+
+  const { selectedBranch } = useBranchStore();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeCart();
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, closeCart]);
+
+  if (!mounted || !isOpen) return null;
+
+  const totalItems = getTotalItems();
+  const totalPrice = getTotalPrice();
+  const isMixed = hasMixedStorage();
+
+  const handleCheckout = () => {
+    closeCart();
+    router.push('/checkout');
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      {/* Backdrop */}
+      <div 
+        className="fixed inset-0 bg-stone-900/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+        onClick={closeCart}
+      />
+
+      {/* Drawer Panel */}
+      <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col z-10 animate-in slide-in-from-right duration-300">
+        
+        {/* Drawer Header */}
+        <div className="p-5 border-b border-stone-200 flex items-center justify-between bg-[#FAF7F2]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#231812] text-[#FAF7F2] flex items-center justify-center font-bold">
+              <ShoppingBag className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-[#231812] leading-tight">
+                Giỏ Hàng Của Bạn
+              </h2>
+              <span className="text-xs text-stone-500">
+                {totalItems} sản phẩm đã chọn
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={clearCart}
+                className="text-[11px] font-semibold text-stone-600 hover:text-red-700 p-2 hover:bg-stone-100 rounded-lg transition-colors"
+                title="Xóa tất cả"
+              >
+                Xóa tất cả
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={closeCart}
+              className="p-2 rounded-xl text-stone-400 hover:text-stone-700 hover:bg-stone-200/60 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Selected Branch Indicator */}
+        {selectedBranch && (
+          <div className="px-5 py-2.5 bg-amber-50/80 border-b border-amber-100/80 flex items-center justify-between text-xs">
+            <div className="flex items-center gap-1.5 text-stone-700">
+              <Store className="w-3.5 h-3.5 text-[#C67C3B] shrink-0" />
+              <span className="truncate max-w-[240px]">
+                Giao từ: <strong>{selectedBranch.name}</strong>
+              </span>
+            </div>
+            <Link 
+              href="/stores" 
+              onClick={closeCart}
+              className="text-[#C67C3B] font-bold hover:underline shrink-0 text-[11px]"
+            >
+              Đổi chi nhánh
+            </Link>
+          </div>
+        )}
+
+        {/* Mixed Storage Warning Alert Banner */}
+        {isMixed && (
+          <div className="mx-4 mt-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-[#231812] text-xs flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 text-[#C67C3B] shrink-0 mt-0.5" />
+            <div className="leading-relaxed">
+              <strong className="block font-bold text-amber-900 mb-0.5">
+                Lưu ý đóng gói chuyên biệt:
+              </strong>
+              Giỏ hàng của bạn gồm cả <strong>Bánh tươi (0-10°C)</strong> và <strong>Bánh đông lạnh (-18°C)</strong>. Cobi Bread sẽ đóng gói 2 kiện bảo quản riêng biệt để đảm bảo nhiệt độ chuẩn nhất khi giao tới bạn.
+            </div>
+          </div>
+        )}
+
+        {/* Items List */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4 divide-y divide-stone-100">
+          {items.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
+              <div className="w-20 h-20 rounded-3xl bg-[#FAF7F2] text-[#C67C3B] flex items-center justify-center border border-amber-100 shadow-2xs">
+                <ShoppingBag className="w-9 h-9 stroke-[1.5]" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-[#231812]">
+                  Giỏ hàng đang trống
+                </h3>
+                <p className="text-xs text-stone-500 max-w-xs leading-relaxed">
+                  Hãy chọn những mẻ bánh nướng tươi ngon nhất từ lò nướng Cobi Bread để thưởng thức ngay hôm nay!
+                </p>
+              </div>
+              <Link
+                href="/products"
+                onClick={closeCart}
+                className="px-5 py-2.5 rounded-xl bg-[#C67C3B] hover:bg-[#A86224] text-white font-bold text-xs shadow-md shadow-[#C67C3B]/20 transition-all flex items-center gap-1.5"
+              >
+                <span>Khám phá thực đơn</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+          ) : (
+            items.map(({ product, quantity }) => {
+              const storageInfo = getStorageBadge(product.storageType);
+              const img = product.images?.[0] || 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400&auto=format&fit=crop';
+
+              return (
+                <div key={product.id} className="pt-4 first:pt-0 flex gap-3.5 items-start">
+                  {/* Thumbnail */}
+                  <img
+                    src={img}
+                    alt={product.name}
+                    className="w-18 h-18 rounded-2xl object-cover bg-stone-100 border border-stone-200 shrink-0"
+                  />
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        href={`/products/${product.slug}`}
+                        onClick={closeCart}
+                        className="text-xs font-bold text-[#231812] hover:text-[#C67C3B] transition-colors line-clamp-2 leading-snug"
+                      >
+                        {product.name}
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(product.id)}
+                        className="text-stone-400 hover:text-red-600 transition-colors p-1"
+                        title="Xóa món"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Storage & Net weight badges */}
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-md border ${storageInfo.className}`}>
+                        {storageInfo.icon}
+                        <span>{product.storageType === 'FRESH' ? '0-10°C' : product.storageType === 'FROZEN' ? '-18°C' : 'Thường'}</span>
+                      </span>
+                      <span className="text-[10px] font-mono text-stone-600">
+                        {product.netWeightG}g
+                      </span>
+                    </div>
+
+                    {/* Price and Counter */}
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-xs font-bold text-[#C67C3B]">
+                        {formatVND(product.price * quantity)}
+                      </span>
+
+                      {/* Quantity buttons */}
+                      <div className="flex items-center border border-stone-200 rounded-lg bg-[#FAF7F2] overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(product.id, quantity - 1)}
+                          className="p-1 hover:bg-stone-200 text-stone-700 transition-colors"
+                        >
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="w-7 text-center font-bold text-xs text-[#231812]">
+                          {quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(product.id, quantity + 1)}
+                          className="p-1 hover:bg-stone-200 text-stone-700 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Drawer Footer & Checkout Action */}
+        {items.length > 0 && (
+          <div className="p-5 border-t border-stone-200 bg-[#FAF7F2] space-y-3.5">
+            <div className="space-y-1.5 text-xs text-stone-600">
+              <div className="flex justify-between">
+                <span>Tạm tính ({totalItems} món)</span>
+                <span className="font-semibold text-[#231812]">{formatVND(totalPrice)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Phí vận chuyển</span>
+                <span className="text-emerald-700 font-medium">Tính tại bước kế tiếp</span>
+              </div>
+              <div className="flex justify-between text-sm font-black text-[#231812] pt-2 border-t border-stone-200">
+                <span>Tổng thanh toán</span>
+                <span className="text-base text-[#C67C3B]">{formatVND(totalPrice)}</span>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCheckout}
+              className="w-full py-3.5 px-4 rounded-2xl bg-[#C67C3B] hover:bg-[#A86224] active:bg-[#8D501B] text-white font-extrabold text-sm shadow-md shadow-[#C67C3B]/25 transition-all flex items-center justify-center gap-2"
+            >
+              <span>Tiến hành đặt hàng</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={closeCart}
+              className="w-full text-center text-xs font-semibold text-stone-500 hover:text-stone-800 transition-colors"
+            >
+              Tiếp tục chọn bánh
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
