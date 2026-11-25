@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslation } from '@/i18n';
+
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -7,7 +9,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { 
-  Store, 
   Mail, 
   Lock, 
   User as UserIcon, 
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { authApi } from '@/lib/api';
 import { useAuthStore } from '@/stores/auth.store';
+import { BRAND_ASSETS } from '@/data/cobi-content';
 
 const registerSchema = z.object({
   fullName: z.string().min(2, 'Họ và tên phải có ít nhất 2 ký tự'),
@@ -34,6 +36,7 @@ const registerSchema = z.object({
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
@@ -94,24 +97,23 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50/60 via-stone-50 to-amber-100/30 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#FAF7F2] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       {/* Brand Header */}
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
-        <Link href="/" className="inline-flex items-center gap-3 group">
-          <div className="w-12 h-12 rounded-2xl bg-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-600/25 group-hover:scale-105 transition-transform">
-            <Store className="w-6 h-6" />
-          </div>
-          <span className="text-2xl font-bold tracking-tight text-stone-900">
-            Cobi <span className="text-amber-600">Bread</span>
-          </span>
+        <Link href="/" className="inline-flex items-center justify-center group">
+          <img
+            src={BRAND_ASSETS.logo}
+            alt="COBI BREAD"
+            className="h-11 w-auto object-contain transition-transform duration-300 group-hover:scale-105"
+          />
         </Link>
-        <h2 className="mt-6 text-2xl sm:text-3xl font-extrabold text-stone-900">
-          Tạo tài khoản khách hàng
+        <h2 className="mt-6 text-2xl sm:text-3xl font-bold text-[#231812] font-display">
+          {t.auth.registerHeading}
         </h2>
-        <p className="mt-2 text-sm text-stone-600">
-          Đã có tài khoản?{' '}
-          <Link href="/login" className="font-semibold text-amber-700 hover:text-amber-800 underline">
-            Đăng nhập ngay
+        <p className="mt-2 text-sm text-[#6E5C50]">
+          {t.auth.hasAccount}{' '}
+          <Link href="/login" className="font-semibold text-[#F37021] hover:text-[#D95D14] underline">
+            {t.auth.loginNowLink}
           </Link>
         </p>
       </div>
@@ -139,7 +141,7 @@ export default function RegisterPage() {
             {/* Full Name */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
-                Họ và tên
+                {t.auth.fullNameLabel}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
@@ -152,7 +154,7 @@ export default function RegisterPage() {
                   className={`block w-full pl-11 pr-3 py-2.5 rounded-xl border text-stone-900 text-sm placeholder-stone-400 focus:outline-none transition-colors ${
                     errors.fullName
                       ? 'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-                      : 'border-stone-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                      : 'border-stone-300 focus:border-[#F37021] focus:ring-2 focus:ring-[#F37021]/20'
                   }`}
                 />
               </div>
@@ -166,7 +168,7 @@ export default function RegisterPage() {
             {/* Email */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
-                Địa chỉ Email
+                {t.auth.emailLabel}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
@@ -179,7 +181,7 @@ export default function RegisterPage() {
                   className={`block w-full pl-11 pr-3 py-2.5 rounded-xl border text-stone-900 text-sm placeholder-stone-400 focus:outline-none transition-colors ${
                     errors.email
                       ? 'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-                      : 'border-stone-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                      : 'border-stone-300 focus:border-[#F37021] focus:ring-2 focus:ring-[#F37021]/20'
                   }`}
                 />
               </div>
@@ -193,7 +195,7 @@ export default function RegisterPage() {
             {/* Password */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
-                Mật khẩu (ít nhất 6 ký tự)
+                {t.auth.passwordMinLabel}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
@@ -206,7 +208,7 @@ export default function RegisterPage() {
                   className={`block w-full pl-11 pr-11 py-2.5 rounded-xl border text-stone-900 text-sm placeholder-stone-400 focus:outline-none transition-colors ${
                     errors.password
                       ? 'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-                      : 'border-stone-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                      : 'border-stone-300 focus:border-[#F37021] focus:ring-2 focus:ring-[#F37021]/20'
                   }`}
                 />
                 <button
@@ -227,7 +229,7 @@ export default function RegisterPage() {
             {/* Confirm Password */}
             <div>
               <label className="block text-xs font-semibold text-stone-700 uppercase tracking-wider mb-1.5">
-                Xác nhận mật khẩu
+                {t.auth.confirmPasswordLabel}
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
@@ -240,7 +242,7 @@ export default function RegisterPage() {
                   className={`block w-full pl-11 pr-3 py-2.5 rounded-xl border text-stone-900 text-sm placeholder-stone-400 focus:outline-none transition-colors ${
                     errors.confirmPassword
                       ? 'border-red-400 bg-red-50/30 focus:border-red-500 focus:ring-2 focus:ring-red-200'
-                      : 'border-stone-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-200'
+                      : 'border-stone-300 focus:border-[#F37021] focus:ring-2 focus:ring-[#F37021]/20'
                   }`}
                 />
               </div>
@@ -255,16 +257,16 @@ export default function RegisterPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full mt-4 py-3 px-4 rounded-xl font-semibold text-sm text-white bg-amber-600 hover:bg-amber-700 active:bg-amber-800 transition-all shadow-md shadow-amber-600/20 disabled:opacity-70 flex items-center justify-center gap-2"
+              className="w-full mt-4 py-3 px-4 rounded-xl font-semibold text-sm text-white bg-[#F37021] hover:bg-[#D95D14] active:bg-[#B94B0B] transition-all shadow-md shadow-[#F37021]/20 disabled:opacity-70 flex items-center justify-center gap-2"
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang đăng ký...</span>
+                  <span>{t.auth.registering}</span>
                 </>
               ) : (
                 <>
-                  <span>Đăng ký tài khoản</span>
+                  <span>{t.auth.registerBtn}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

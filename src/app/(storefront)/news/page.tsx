@@ -1,115 +1,139 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import { Calendar, ArrowRight, Sparkles, Store } from 'lucide-react';
-import { Header } from '@/components/Header';
-import { Footer } from '@/components/Footer';
-
-const newsArticles = [
-  {
-    id: 1,
-    title: 'Ra mắt vị mới chỉ có tại GS25: Bánh Mì Kem Tươi Muối Hồng Himalaya',
-    date: '22/12/2025',
-    category: 'Sản Phẩm Mới',
-    desc: 'Sự kết hợp độc đáo giữa vị béo ngậy của kem sữa tươi và chút mặn thanh dịu của muối khoáng Himalaya, mang đến trải nghiệm vị giác bùng nổ chỉ có tại chuỗi cửa hàng tiện lợi GS25.',
-    img: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop',
-  },
-  {
-    id: 2,
-    title: 'Cobi "Song Kiếm Hợp Bích" tại Coffee Expo Vietnam 2025',
-    date: '29/10/2025',
-    category: 'Sự Kiện',
-    desc: 'Cobi Bread cùng Cobi Home giới thiệu giải pháp quầy bánh ngọt & máy làm bánh tự động cho hơn 200 đối tác F&B tại triển lãm SECC Quận 7.',
-    img: 'https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=800&auto=format&fit=crop',
-  },
-  {
-    id: 3,
-    title: 'Cafeshow 2025 – Khơi nguồn giải pháp doanh nghiệp F&B',
-    date: '17/04/2025',
-    category: 'Giải Pháp B2B',
-    desc: 'Giải pháp bánh mì cấp đông sâu giúp chuỗi cafe tối ưu chi phí bếp bánh và đồng bộ chất lượng vượt trội tại mọi điểm bán.',
-    img: 'https://images.unsplash.com/photo-1579372786545-d24232daf58c?w=800&auto=format&fit=crop',
-  },
-  {
-    id: 4,
-    title: 'Cobi Bread Tower 1 – Góc nhỏ ngọt ngào giữa lòng Quận 7',
-    date: '14/03/2025',
-    category: 'Cửa Hàng',
-    desc: 'Không gian tiệm bánh đậm chất thư thái tại tòa nhà Cobi Tower, 69 Hoàng Văn Thái, Tân Phú, Quận 7 với view ngắm phố thoáng đãng.',
-    img: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=800&auto=format&fit=crop',
-  },
-];
+import { Calendar, User, ChevronRight, Newspaper, ArrowRight } from 'lucide-react';
+import { getLocalizedNewsArticles } from '@/data/cobi-content';
+import { useTranslation } from '@/i18n';
 
 export default function NewsPage() {
+  const { t, locale } = useTranslation();
+  const articles = getLocalizedNewsArticles(locale);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+
+  // Reset category filter to ALL when switching locale so labels never go stale
+  useEffect(() => {
+    setSelectedCategory('ALL');
+  }, [locale]);
+
+  const categories = useMemo(() => {
+    const unique = Array.from(new Set(articles.map((a) => a.category)));
+    return unique;
+  }, [articles]);
+
+  const filteredArticles =
+    selectedCategory === 'ALL'
+      ? articles
+      : articles.filter((article) => article.category === selectedCategory);
+
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF7F2] text-[#231812]">
-      <Header />
+    <div className="bg-[#FAF7F2] min-h-screen py-10 sm:py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-xs text-stone-500">
+          <Link href="/" className="hover:text-[#F37021] transition-colors">
+            {t.common.home}
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5" />
+          <span className="font-semibold text-[#231812]">{t.common.news}</span>
+        </nav>
 
-      <main className="flex-1 py-12 sm:py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10">
-          
-          <div className="text-center max-w-2xl mx-auto space-y-3">
-            <span className="text-xs font-bold uppercase tracking-widest text-[#C67C3B]">
-              Bản Tin Cobi Bread
-            </span>
-            <h1 className="text-3xl sm:text-4xl font-extrabold text-[#231812] font-display">
-              Tin Tức & Hoạt Động Sự Kiện
-            </h1>
-            <p className="text-xs sm:text-sm text-stone-600">
-              Cập nhật các chương trình ra mắt sản phẩm mới, sự kiện triển lãm F&B và hoạt động kết nối cộng đồng của Cobi Bread.
-            </p>
+        {/* Header */}
+        <div className="text-center max-w-2xl mx-auto space-y-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-50 border border-orange-200 text-xs font-bold text-[#F37021]">
+            <Newspaper className="w-3.5 h-3.5" />
+            <span>{t.newsPage.eyebrow}</span>
           </div>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold text-[#231812] tracking-tight">
+            {t.newsPage.title}
+          </h1>
+          <p className="text-sm text-stone-600 leading-relaxed">{t.newsPage.subtitle}</p>
+        </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {newsArticles.map((article) => (
-              <article
-                key={article.id}
-                className="bg-white rounded-3xl overflow-hidden border border-stone-200 shadow-2xs hover:shadow-xl transition-all duration-300 flex flex-col justify-between group"
-              >
-                <div className="aspect-16/9 overflow-hidden bg-stone-100 relative">
+        {/* Category Filter Tabs */}
+        <div className="flex items-center justify-center flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectedCategory('ALL')}
+            className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+              selectedCategory === 'ALL'
+                ? 'bg-[#231812] text-white border-[#231812] shadow-xs'
+                : 'bg-white text-stone-700 border-stone-200 hover:border-[#F37021] hover:text-[#F37021]'
+            }`}
+          >
+            {t.newsPage.allCategory}
+          </button>
+
+          {categories.map((cat) => (
+            <button
+              key={cat}
+              type="button"
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all cursor-pointer border ${
+                selectedCategory === cat
+                  ? 'bg-[#F37021] text-white border-[#F37021] shadow-xs'
+                  : 'bg-white text-stone-700 border-stone-200 hover:border-[#F37021] hover:text-[#F37021]'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        {/* Articles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
+          {filteredArticles.map((article) => (
+            <Link
+              key={article.slug}
+              href={`/news/${article.slug}`}
+              className="group bg-white rounded-3xl border border-stone-200/80 overflow-hidden hover:border-[#F37021]/60 hover:shadow-xl transition-all flex flex-col justify-between"
+            >
+              <div>
+                <div className="relative aspect-[16/10] w-full bg-stone-100 overflow-hidden">
                   <img
-                    src={article.img}
+                    src={article.thumbnail}
                     alt={article.title}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    loading="lazy"
                   />
-                  <div className="absolute top-4 left-4">
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#C67C3B] text-white">
-                      {article.category}
-                    </span>
-                  </div>
+                  <span className="absolute top-3 left-3 px-3 py-1 rounded-full bg-white/95 text-[#231812] text-[10px] font-bold shadow-xs">
+                    {article.category}
+                  </span>
                 </div>
 
-                <div className="p-6 sm:p-8 space-y-3 flex-1 flex flex-col justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs text-stone-500">
-                      <Calendar className="w-3.5 h-3.5 text-[#C67C3B]" />
-                      <span>{article.date}</span>
-                    </div>
-
-                    <h2 className="text-lg sm:text-xl font-bold text-[#231812] group-hover:text-[#C67C3B] transition-colors leading-snug font-display">
-                      {article.title}
-                    </h2>
-
-                    <p className="text-xs sm:text-sm text-stone-600 leading-relaxed">
-                      {article.desc}
-                    </p>
-                  </div>
-
-                  <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
-                    <span className="text-xs font-bold text-[#C67C3B] group-hover:underline flex items-center gap-1">
-                      Xem chi tiết bài viết
-                      <ArrowRight className="w-3.5 h-3.5" />
+                <div className="p-6 space-y-3">
+                  <div className="flex items-center gap-3 text-[11px] text-stone-500">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3.5 h-3.5 text-[#F37021]" />
+                      {article.date}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <User className="w-3.5 h-3.5 text-[#F37021]" />
+                      {article.author}
                     </span>
                   </div>
+
+                  <h2 className="font-display text-lg font-bold text-[#231812] group-hover:text-[#F37021] transition-colors line-clamp-2 leading-snug">
+                    {article.title}
+                  </h2>
+
+                  <p className="text-xs text-stone-600 leading-relaxed line-clamp-3">
+                    {article.excerpt}
+                  </p>
                 </div>
-              </article>
-            ))}
-          </div>
+              </div>
+
+              <div className="px-6 pb-6 pt-2">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#F37021] group-hover:underline">
+                  <span>{t.newsPage.readMore}</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </Link>
+          ))}
         </div>
-      </main>
-
-      <Footer />
+      </div>
     </div>
   );
 }

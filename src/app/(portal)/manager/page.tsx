@@ -21,6 +21,7 @@ import {
 import { useAuthStore } from '@/stores/auth.store';
 import { branchesApi, authApi } from '@/lib/api';
 import { Branch } from '@/types';
+import { BRAND_ASSETS } from '@/data/cobi-content';
 
 export default function ManagerDashboardPage() {
   const router = useRouter();
@@ -77,14 +78,16 @@ export default function ManagerDashboardPage() {
             
             {/* Brand & Portal Title */}
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div>
-                <span className="text-lg font-bold text-stone-900 leading-tight block">
-                  Cobi Bread Manager Portal
+              <img
+                src={BRAND_ASSETS.logo}
+                alt="COBI BREAD"
+                className="h-8 w-auto object-contain shrink-0"
+              />
+              <div className="hidden sm:block pl-3 border-l border-stone-200">
+                <span className="text-sm font-bold text-[#231812] leading-tight block">
+                  Manager Portal
                 </span>
-                <span className="text-xs text-stone-500 font-medium">
+                <span className="text-xs text-[#6E5C50] font-medium">
                   Trang quản trị vận hành chi nhánh
                 </span>
               </div>
@@ -96,7 +99,7 @@ export default function ManagerDashboardPage() {
                 href="/"
                 className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 transition-colors"
               >
-                <Store className="w-3.5 h-3.5 text-amber-600" />
+                <Store className="w-3.5 h-3.5 text-[#F37021]" />
                 <span>Xem Cửa Hàng</span>
               </Link>
 
