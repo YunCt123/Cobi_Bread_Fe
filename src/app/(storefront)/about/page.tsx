@@ -14,7 +14,7 @@ import {
   ZoomIn,
 } from 'lucide-react';
 import { BRAND_ASSETS, getLocalizedAboutData } from '@/data/cobi-content';
-import ImageLightboxModal, { LightboxItem } from '@/components/ImageLightboxModal';
+import ImageLightboxModal, { LightboxItem } from '@/components/common/ImageLightboxModal';
 import { useTranslation } from '@/i18n';
 
 export default function AboutPage() {

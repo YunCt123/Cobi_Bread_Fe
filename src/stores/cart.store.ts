@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Product, StorageType } from '@/types';
+import type { Product, StorageType } from '@/types';
 import { BRAND_ASSETS } from '@/data/cobi-content';
 
 export interface CartItem {
@@ -34,10 +34,20 @@ interface CartState {
 }
 
 const dummyStorage = {
-  getItem: (_key: string) => null,
-  setItem: (_key: string, _value: string) => {},
-  removeItem: (_key: string) => {},
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
 };
+
+function sanitizePositiveInt(val: unknown, fallback = 1): number {
+  const num = Math.floor(Number(val));
+  return Number.isFinite(num) && num >= 1 ? num : fallback;
+}
+
+function sanitizeNonNegativePrice(val: unknown): number {
+  const num = Number(val);
+  return Number.isFinite(num) && num >= 0 ? num : 0;
+}
 
 function toCartItem(product: Product, quantity: number): CartItem {
   return {
@@ -45,45 +55,51 @@ function toCartItem(product: Product, quantity: number): CartItem {
     name: product.name,
     nameEn: product.nameEn ?? null,
     slug: product.slug,
-    price: product.price,
+    price: sanitizeNonNegativePrice(product.price),
     image: product.images?.[0] || BRAND_ASSETS.heroImage,
     storageType: product.storageType,
     netWeightG: product.netWeightG,
-    quantity,
+    quantity: sanitizePositiveInt(quantity, 1),
     product,
   };
 }
 
-function normalizeStoredItem(raw: any): CartItem | null {
+function normalizeStoredItem(raw: unknown): CartItem | null {
   if (!raw || typeof raw !== 'object') return null;
-  if (raw.product && raw.product.id) {
-    return {
-      productId: raw.productId || raw.product.id,
-      name: raw.name || raw.product.name,
-      nameEn: raw.nameEn ?? raw.product.nameEn ?? null,
-      slug: raw.slug || raw.product.slug,
-      price: Number(raw.price ?? raw.product.price ?? 0),
-      image: raw.image || raw.product.images?.[0] || BRAND_ASSETS.heroImage,
-      storageType: raw.storageType || raw.product.storageType || 'FRESH',
-      netWeightG: raw.netWeightG ?? raw.product.netWeightG,
-      quantity: Math.max(1, Number(raw.quantity || 1)),
-      product: raw.product,
-    };
-  }
-  if (raw.productId) {
-    return {
-      productId: String(raw.productId),
-      name: String(raw.name || 'Cobi Bread'),
-      nameEn: raw.nameEn ?? null,
-      slug: String(raw.slug || ''),
-      price: Number(raw.price || 0),
-      image: String(raw.image || BRAND_ASSETS.heroImage),
-      storageType: raw.storageType || 'FRESH',
-      netWeightG: raw.netWeightG,
-      quantity: Math.max(1, Number(raw.quantity || 1)),
-    };
-  }
-  return null;
+  const obj = raw as Record<string, unknown>;
+  const nestedProd =
+    obj.product && typeof obj.product === 'object'
+      ? (obj.product as Partial<Product>)
+      : undefined;
+
+  const productId = String(obj.productId || nestedProd?.id || '').trim();
+  if (!productId) return null;
+
+  const storageRaw = obj.storageType || nestedProd?.storageType;
+  const storageType: StorageType =
+    storageRaw === 'FROZEN' || storageRaw === 'AMBIENT' ? storageRaw : 'FRESH';
+
+  return {
+    productId,
+    name: String(obj.name || nestedProd?.name || 'Cobi Bread'),
+    nameEn:
+      typeof obj.nameEn === 'string'
+        ? obj.nameEn
+        : typeof nestedProd?.nameEn === 'string'
+        ? nestedProd.nameEn
+        : null,
+    slug: String(obj.slug || nestedProd?.slug || ''),
+    price: sanitizeNonNegativePrice(obj.price ?? nestedProd?.price ?? 0),
+    image: String(obj.image || nestedProd?.images?.[0] || BRAND_ASSETS.heroImage),
+    storageType,
+    netWeightG:
+      typeof obj.netWeightG === 'number'
+        ? obj.netWeightG
+        : typeof nestedProd?.netWeightG === 'number'
+        ? nestedProd.netWeightG
+        : undefined,
+    quantity: sanitizePositiveInt(obj.quantity, 1),
+  };
 }
 
 export const useCartStore = create<CartState>()(
@@ -94,6 +110,10 @@ export const useCartStore = create<CartState>()(
       isHydrated: false,
 
       addItem: (product: Product, quantity = 1) => {
+        if (!product || !product.id) return;
+        const safeQty = Math.floor(Number(quantity));
+        if (!Number.isFinite(safeQty) || safeQty <= 0) return;
+
         set((state) => {
           const existingIndex = state.items.findIndex(
             (item) => (item.productId || item.product?.id) === product.id
@@ -103,13 +123,13 @@ export const useCartStore = create<CartState>()(
             const newItems = [...state.items];
             const prev = newItems[existingIndex];
             newItems[existingIndex] = {
-              ...toCartItem(product, prev.quantity + quantity),
+              ...toCartItem(product, prev.quantity + safeQty),
             };
             return { items: newItems, isOpen: true };
           }
 
           return {
-            items: [...state.items, toCartItem(product, quantity)],
+            items: [...state.items, toCartItem(product, safeQty)],
             isOpen: true,
           };
         });
@@ -124,14 +144,17 @@ export const useCartStore = create<CartState>()(
       },
 
       updateQuantity: (productId: string, quantity: number) => {
-        if (quantity <= 0) {
+        const safeQty = Math.floor(Number(quantity));
+        if (!Number.isFinite(safeQty) || safeQty <= 0) {
           get().removeItem(productId);
           return;
         }
 
         set((state) => ({
           items: state.items.map((item) =>
-            (item.productId || item.product?.id) === productId ? { ...item, quantity } : item
+            (item.productId || item.product?.id) === productId
+              ? { ...item, quantity: safeQty }
+              : item
           ),
         }));
       },
@@ -146,11 +169,15 @@ export const useCartStore = create<CartState>()(
       setHydrated: (hydrated: boolean) => set({ isHydrated: hydrated }),
 
       getTotalItems: () => {
-        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+        return get().items.reduce((sum, item) => sum + sanitizePositiveInt(item.quantity, 0), 0);
       },
 
       getTotalPrice: () => {
-        return get().items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        return get().items.reduce(
+          (sum, item) =>
+            sum + sanitizeNonNegativePrice(item.price) * sanitizePositiveInt(item.quantity, 0),
+          0
+        );
       },
 
       hasMixedStorage: () => {
@@ -166,7 +193,17 @@ export const useCartStore = create<CartState>()(
         typeof window !== 'undefined' ? localStorage : dummyStorage
       ),
       partialize: (state) => ({
-        items: state.items.map(({ product: _ignored, ...rest }) => rest),
+        items: state.items.map((item) => ({
+          productId: item.productId,
+          name: item.name,
+          nameEn: item.nameEn,
+          slug: item.slug,
+          price: item.price,
+          image: item.image,
+          storageType: item.storageType,
+          netWeightG: item.netWeightG,
+          quantity: item.quantity,
+        })),
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
@@ -174,6 +211,8 @@ export const useCartStore = create<CartState>()(
             state.items = state.items
               .map(normalizeStoredItem)
               .filter((x): x is CartItem => x !== null);
+          } else {
+            state.items = [];
           }
           state.setHydrated(true);
         }

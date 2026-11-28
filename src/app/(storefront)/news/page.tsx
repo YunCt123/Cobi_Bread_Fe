@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Calendar, User, ChevronRight, Newspaper, ArrowRight } from 'lucide-react';
 import { getLocalizedNewsArticles } from '@/data/cobi-content';
@@ -10,17 +10,16 @@ export default function NewsPage() {
   const { t, locale } = useTranslation();
   const articles = getLocalizedNewsArticles(locale);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
-
-  // Reset category filter to ALL when switching locale so labels never go stale
-  useEffect(() => {
-    setSelectedCategory('ALL');
-  }, [locale]);
+  const [rawSelectedCategory, setSelectedCategory] = useState<string>('ALL');
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(articles.map((a) => a.category)));
     return unique;
   }, [articles]);
+  const selectedCategory =
+    rawSelectedCategory === 'ALL' || categories.includes(rawSelectedCategory)
+      ? rawSelectedCategory
+      : 'ALL';
 
   const filteredArticles =
     selectedCategory === 'ALL'

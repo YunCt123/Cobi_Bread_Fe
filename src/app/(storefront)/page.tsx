@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import { useMounted } from '@/hooks/useMounted';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -17,11 +18,11 @@ import {
   Newspaper,
   Calendar,
 } from 'lucide-react';
-import { categoriesApi, productsApi } from '@/lib/api';
+import { categoriesApi, productsApi } from '@/services';
 import { Category, Product } from '@/types';
 import { useBranchStore } from '@/stores/branch.store';
-import ProductCard from '@/components/ProductCard';
-import VideoModal from '@/components/VideoModal';
+import ProductCard from '@/components/storefront/ProductCard';
+import VideoModal from '@/components/common/VideoModal';
 import {
   BRAND_ASSETS,
   getCategoryThumbnail,
@@ -40,13 +41,9 @@ export default function HomePage() {
   const { t, locale } = useTranslation();
   const { selectedBranch } = useBranchStore();
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [activeTab, setActiveTab] = useState<FilterTab>('ALL');
   const [isVideoOpen, setIsVideoOpen] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const aboutData = getLocalizedAboutData(locale);
   const newsArticles = getLocalizedNewsArticles(locale);

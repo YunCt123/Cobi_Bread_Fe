@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 90" fill="none">
+  <rect x="2" y="2" width="236" height="86" rx="12" fill="#0B5ED7" stroke="#FFFFFF" stroke-width="3"/>
+  <circle cx="46" cy="45" r="26" fill="#FFFFFF"/>
+  <path d="M35 45.5L42.5 53L58 37.5" stroke="#0B5ED7" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="84" y="38" fill="#FFFFFF" font-family="Arial, sans-serif" font-size="14" font-weight="700" letter-spacing="0.5">ĐÃ THÔNG BÁO</text>
+  <text x="84" y="60" fill="#FFD43B" font-family="Arial, sans-serif" font-size="15" font-weight="800" letter-spacing="0.5">BỘ CÔNG THƯƠNG</text>
+</svg>

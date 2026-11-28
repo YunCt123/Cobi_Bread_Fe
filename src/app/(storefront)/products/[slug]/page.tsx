@@ -21,10 +21,10 @@ import {
   Truck,
   ShieldCheck,
 } from 'lucide-react';
-import { productsApi } from '@/lib/api';
+import { productsApi } from '@/services';
 import { Product } from '@/types';
 import { useCartStore } from '@/stores/cart.store';
-import { formatVND, getStorageBadge } from '@/components/ProductCard';
+import { formatVND, getStorageBadge } from '@/components/storefront/ProductCard';
 import { BRAND_ASSETS } from '@/data/cobi-content';
 import {
   useTranslation,

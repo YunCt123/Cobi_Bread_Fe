@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import Link from 'next/link';
 import {
   Play,
@@ -12,8 +12,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { getLocalizedMediaData, MediaVideo } from '@/data/cobi-content';
-import VideoModal from '@/components/VideoModal';
-import ImageLightboxModal, { LightboxItem } from '@/components/ImageLightboxModal';
+import VideoModal from '@/components/common/VideoModal';
+import ImageLightboxModal, { LightboxItem } from '@/components/common/ImageLightboxModal';
 import { useTranslation } from '@/i18n';
 
 export default function MediaPage() {
@@ -21,18 +21,18 @@ export default function MediaPage() {
   const mediaData = getLocalizedMediaData(locale);
 
   const [activeTab, setActiveTab] = useState<'ALL' | 'VIDEO' | 'IMAGE'>('ALL');
-  const [activeImageCategory, setActiveImageCategory] = useState<string>('ALL');
+  const [rawImageCategory, setActiveImageCategory] = useState<string>('ALL');
   const [playingVideo, setPlayingVideo] = useState<MediaVideo | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-
-  useEffect(() => {
-    setActiveImageCategory('ALL');
-  }, [locale]);
 
   const imageCategories = useMemo(
     () => Array.from(new Set(mediaData.images.map((img) => img.category))),
     [mediaData.images]
   );
+  const activeImageCategory =
+    rawImageCategory === 'ALL' || imageCategories.includes(rawImageCategory)
+      ? rawImageCategory
+      : 'ALL';
 
   const filteredImages =
     activeImageCategory === 'ALL'

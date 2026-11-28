@@ -11,9 +11,9 @@ interface LanguageState {
 }
 
 const dummyStorage = {
-  getItem: (_key: string) => null,
-  setItem: (_key: string, _value: string) => {},
-  removeItem: (_key: string) => {},
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
 };
 
 export const useLanguageStore = create<LanguageState>()(
@@ -23,7 +23,7 @@ export const useLanguageStore = create<LanguageState>()(
       isHydrated: false,
 
       setLocale: (locale: Locale) => {
-        set({ locale });
+        set({ locale: locale === 'en' ? 'en' : 'vi' });
       },
 
       setHydrated: (hydrated: boolean) => {

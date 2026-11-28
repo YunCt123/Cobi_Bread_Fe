@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
@@ -16,9 +16,9 @@ import {
   SlidersHorizontal,
   Loader2,
 } from 'lucide-react';
-import { categoriesApi, productsApi } from '@/lib/api';
+import { categoriesApi, productsApi } from '@/services';
 import { Category, Product, StorageType } from '@/types';
-import ProductCard from '@/components/ProductCard';
+import ProductCard from '@/components/storefront/ProductCard';
 import { useTranslation, getLocalizedCategoryName } from '@/i18n';
 
 function ProductsContent() {
@@ -33,11 +33,13 @@ function ProductsContent() {
   const searchParam = searchParams.get('search') || '';
   const pageParam = Number(searchParams.get('page')) || 1;
 
-  const [localSearch, setLocalSearch] = useState(searchParam);
-
-  useEffect(() => {
-    setLocalSearch(searchParam);
-  }, [searchParam]);
+  const [searchDraft, setSearchDraft] = useState<{ base: string; value: string }>({
+    base: searchParam,
+    value: searchParam,
+  });
+  const localSearch = searchDraft.base === searchParam ? searchDraft.value : searchParam;
+  const setLocalSearch = (val: string) =>
+    setSearchDraft({ base: searchParam, value: val });
 
   // Fetch Categories with ?lang=
   const { data: categories = [] } = useQuery<Category[]>({
