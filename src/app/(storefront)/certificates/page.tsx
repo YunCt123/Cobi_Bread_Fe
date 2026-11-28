@@ -13,7 +13,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { getLocalizedCertificatesData, BRAND_ASSETS } from '@/data/cobi-content';
-import ImageLightboxModal, { LightboxItem } from '@/components/ImageLightboxModal';
+import ImageLightboxModal, { LightboxItem } from '@/components/common/ImageLightboxModal';
 import { useTranslation } from '@/i18n';
 
 export default function CertificatesPage() {

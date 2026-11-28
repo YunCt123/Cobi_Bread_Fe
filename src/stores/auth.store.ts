@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import Cookies from 'js-cookie';
-import { User, Role } from '@/types';
+import type { User } from '@/types';
 
 export const COOKIE_TOKEN_KEY = 'cobi_access_token';
 export const COOKIE_ROLE_KEY = 'cobi_user_role';
@@ -20,9 +20,9 @@ interface AuthState {
 }
 
 const dummyStorage = {
-  getItem: (_key: string) => null,
-  setItem: (_key: string, _value: string) => {},
-  removeItem: (_key: string) => {},
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -35,7 +35,6 @@ export const useAuthStore = create<AuthState>()(
       isHydrated: false,
 
       setAuth: (user: User, accessToken: string) => {
-        // Save to cookies with 7-day expiration so middleware and server-side can access
         Cookies.set(COOKIE_TOKEN_KEY, accessToken, { expires: 7, path: '/' });
         Cookies.set(COOKIE_ROLE_KEY, user.role, { expires: 7, path: '/' });
         Cookies.set(COOKIE_USER_KEY, JSON.stringify(user), { expires: 7, path: '/' });
@@ -78,7 +77,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'cobi_auth_store',
-      storage: createJSONStorage(() => (typeof window !== 'undefined' ? localStorage : dummyStorage)),
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined' ? localStorage : dummyStorage
+      ),
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,
@@ -88,7 +89,6 @@ export const useAuthStore = create<AuthState>()(
         if (state) {
           state.setHydrated(true);
 
-          // Sync back to cookies if local storage has valid token but cookies are missing
           if (state.accessToken && state.user) {
             Cookies.set(COOKIE_TOKEN_KEY, state.accessToken, { expires: 7, path: '/' });
             Cookies.set(COOKIE_ROLE_KEY, state.user.role, { expires: 7, path: '/' });

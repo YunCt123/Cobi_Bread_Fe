@@ -1,5 +1,7 @@
 'use client';
 
+import { getApiErrorMessage } from '@/utils/error';
+import { useMounted } from '@/hooks/useMounted';
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,7 +11,6 @@ import { z } from 'zod';
 import {
   ChevronRight,
   MapPin,
-  Truck,
   Store,
   Clock,
   Zap,
@@ -31,7 +32,7 @@ import {
 import { useCartStore } from '@/stores/cart.store';
 import { useBranchStore } from '@/stores/branch.store';
 import { useAuthStore } from '@/stores/auth.store';
-import { branchesApi, inventoryApi, ordersApi } from '@/lib/api';
+import { branchesApi, inventoryApi, ordersApi } from '@/services';
 import {
   Branch,
   DeliveryType,
@@ -39,7 +40,7 @@ import {
   PaymentMethod,
   ProductAvailability,
 } from '@/types';
-import { formatVND, getStorageBadge } from '@/components/ProductCard';
+import { formatVND, getStorageBadge } from '@/components/storefront/ProductCard';
 import { BRAND_ASSETS } from '@/data/cobi-content';
 import {
   useTranslation,
@@ -55,15 +56,11 @@ export default function CheckoutPage() {
   const { user, isAuthenticated } = useAuthStore();
   const { t, locale } = useTranslation();
 
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [deliveryType, setDeliveryType] = useState<DeliveryType>('EXPRESS_NOW');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('COD');
   const [serverError, setServerError] = useState<string | null>(null);
   const [createdOrder, setCreatedOrder] = useState<Order | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // Fetch branches in current locale in case none selected yet
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -78,7 +75,7 @@ export default function CheckoutPage() {
   }, [mounted, branches, selectedBranch, setSelectedBranch]);
 
   const activeBranch = mounted ? selectedBranch || branches[0] || null : null;
-  const safeItems = mounted ? items : [];
+  const safeItems = useMemo(() => (mounted ? items : []), [mounted, items]);
   const subtotal = mounted ? getTotalPrice() : 0;
   const isMixed = mounted ? hasMixedStorage() : false;
   const shippingFee = deliveryType === 'PICKUP' ? 0 : 25000;
@@ -206,10 +203,8 @@ export default function CheckoutPage() {
       queryClient.invalidateQueries({ queryKey: ['inventory-batches'] });
       queryClient.invalidateQueries({ queryKey: ['checkout-availability'] });
     },
-    onError: (err: any) => {
-      const rawMsg = err?.response?.data?.message || err?.message;
-      const msg = Array.isArray(rawMsg) ? rawMsg.join(', ') : rawMsg;
-      setServerError(msg || t.checkoutPage.orderErrorFallback);
+    onError: (err: unknown) => {
+      setServerError(getApiErrorMessage(err, t.checkoutPage.orderErrorFallback));
     },
   });
 

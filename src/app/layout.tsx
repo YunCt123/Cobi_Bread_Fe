@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, Lora } from "next/font/google";
 import "./globals.css";
-import QueryProvider from "@/providers/QueryProvider";
-import CartDrawer from "@/components/CartDrawer";
+import AppProviders from '@/providers/AppProviders';
+import CartDrawer from '@/components/storefront/CartDrawer';
+import { Toaster } from "sonner";
 
 const beVietnamPro = Be_Vietnam_Pro({
   subsets: ["latin", "vietnamese"],
@@ -45,10 +46,11 @@ export default function RootLayout({
       className={`${beVietnamPro.variable} ${lora.variable} h-full antialiased scroll-smooth`}
     >
       <body className="min-h-full flex flex-col font-sans bg-[#FAF7F2] text-[#231812] selection:bg-[#F37021]/20 selection:text-[#231812]">
-        <QueryProvider>
+        <AppProviders>
           {children}
           <CartDrawer />
-        </QueryProvider>
+          <Toaster richColors position="bottom-right" closeButton />
+        </AppProviders>
       </body>
     </html>
   );

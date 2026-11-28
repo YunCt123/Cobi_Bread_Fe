@@ -15,11 +15,11 @@ import {
   ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
-import { productsApi } from '@/lib/api';
+import { productsApi } from '@/services';
 import { Product } from '@/types';
-import ProductCard from '@/components/ProductCard';
+import ProductCard from '@/components/storefront/ProductCard';
 import { BRAND_ASSETS } from '@/data/cobi-content';
-import ImageLightboxModal from '@/components/ImageLightboxModal';
+import ImageLightboxModal from '@/components/common/ImageLightboxModal';
 import { useTranslation } from '@/i18n';
 
 export default function B2bPage() {

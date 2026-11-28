@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useMounted } from '@/hooks/useMounted';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -14,7 +15,7 @@ import {
   Navigation,
   ChevronRight,
 } from 'lucide-react';
-import { branchesApi } from '@/lib/api';
+import { branchesApi } from '@/services';
 import { Branch } from '@/types';
 import { useBranchStore } from '@/stores/branch.store';
 import { getBranchVisualMeta } from '@/data/cobi-content';
@@ -28,12 +29,8 @@ import {
 export default function StoresPage() {
   const { t, locale } = useTranslation();
   const { selectedBranch, setSelectedBranch } = useBranchStore();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [justSelectedId, setJustSelectedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const { data: branches = [], isLoading, isError } = useQuery<Branch[]>({
     queryKey: ['branches', locale],

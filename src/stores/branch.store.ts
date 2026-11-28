@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import { Branch } from '@/types';
+import type { Branch } from '@/types';
 
 interface BranchState {
   selectedBranch: Branch | null;
@@ -12,9 +12,9 @@ interface BranchState {
 }
 
 const dummyStorage = {
-  getItem: (_key: string) => null,
-  setItem: (_key: string, _value: string) => {},
-  removeItem: (_key: string) => {},
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
 };
 
 export const useBranchStore = create<BranchState>()(
@@ -38,7 +38,9 @@ export const useBranchStore = create<BranchState>()(
     }),
     {
       name: 'cobi_branch_store',
-      storage: createJSONStorage(() => (typeof window !== 'undefined' ? localStorage : dummyStorage)),
+      storage: createJSONStorage(() =>
+        typeof window !== 'undefined' ? localStorage : dummyStorage
+      ),
       partialize: (state) => ({
         selectedBranch: state.selectedBranch,
       }),

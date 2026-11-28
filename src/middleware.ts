@@ -33,7 +33,6 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get(COOKIE_TOKEN_KEY)?.value;
   const roleCookie = request.cookies.get(COOKIE_ROLE_KEY)?.value;
 
-  // Lấy role từ token hoặc fallback sang roleCookie
   const jwtPayload = token ? decodeJwt(token) : null;
   const isTokenExpired = jwtPayload?.exp ? jwtPayload.exp * 1000 < Date.now() : false;
   const userRole = (!isTokenExpired && (jwtPayload?.role || roleCookie)) || null;
@@ -47,7 +46,6 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // CUSTOMER và BRANCH_MANAGER không được vào /admin
     if (userRole !== 'ADMIN') {
       if (userRole === 'BRANCH_MANAGER') {
         return NextResponse.redirect(new URL('/manager', request.url));
@@ -66,16 +64,24 @@ export function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // CUSTOMER không được vào /manager
     if (userRole === 'CUSTOMER') {
       return NextResponse.redirect(new URL('/', request.url));
     }
 
-    // ADMIN hoặc BRANCH_MANAGER được phép vào
     return NextResponse.next();
   }
 
-  // 3. Nếu đã đăng nhập, truy cập /login hoặc /register sẽ tự động chuyển hướng theo vai trò
+  // 3. Kiểm soát quyền truy cập trang ACCOUNT (/account/*)
+  if (pathname.startsWith('/account')) {
+    if (!isAuthenticated) {
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
+
+  // 4. Nếu đã đăng nhập, truy cập /login hoặc /register sẽ tự động chuyển hướng theo vai trò
   if ((pathname === '/login' || pathname === '/register') && isAuthenticated && userRole) {
     if (userRole === 'ADMIN') {
       return NextResponse.redirect(new URL('/admin', request.url));
@@ -93,6 +99,7 @@ export const config = {
   matcher: [
     '/admin/:path*',
     '/manager/:path*',
+    '/account/:path*',
     '/login',
     '/register',
   ],
